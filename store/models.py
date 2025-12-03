@@ -24,28 +24,52 @@ class Category(models.Model):
 # Це головна таблиця нашого складу
 # =======================================================
 class Product(models.Model):
-    # Зв'язок "Один до багатьох" з категорією.
-    # on_delete=models.CASCADE означає: якщо видалити Категорію, видаляться всі її Товари.
+    # СПИСОК ВАРІАНТІВ ВИМІРУ
+    UNIT_CHOICES = [
+        ('pcs', 'шт'),
+        ('kg', 'кг'),
+        ('g', 'г'),
+        ('l', 'л'),
+        ('ml', 'мл'),
+    ]
+
     category = models.ForeignKey(Category, on_delete=models.CASCADE, verbose_name="Категорія")
-    
     name = models.CharField(max_length=200, verbose_name="Назва товару")
-    description = models.TextField(blank=True, verbose_name="Опис")
     
-    # DecimalField - обов'язковий для цін! FloatField використовувати не можна через похибки округлення.
-    # max_digits=10 (всього цифр), decimal_places=2 (цифри після коми).
+    # --- НОВІ ПОЛЯ ---
+    # 1. Саме число (напр. 0.5 або 100). DecimalField дозволяє дроби (1.5 кг)
+    weight_value = models.DecimalField(
+        max_digits=6, 
+        decimal_places=3, 
+        blank=True, 
+        null=True, 
+        verbose_name="Вага/Об'єм (число)"
+    )
+    
+    # 2. Випадаючий список (кг, л, шт)
+    weight_unit = models.CharField(
+        max_length=10, 
+        choices=UNIT_CHOICES, 
+        default='pcs', 
+        verbose_name="Одиниця виміру"
+    )
+    # -----------------
+
+    description = models.TextField(blank=True, verbose_name="Опис")
     price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Ціна (грн)")
     
-    # PositiveIntegerField - щоб кількість не могла бути від'ємною (-5 шт).
+    # Це залишок на складі (скільки у нас цих пляшок чи пачок)
     quantity = models.PositiveIntegerField(default=0, verbose_name="Кількість на складі")
     
-    # Поле для картинки. upload_to вказує папку всередині /media/
     image = models.ImageField(upload_to='products/', blank=True, null=True, verbose_name="Фото товару")
-    
-    # Дата додавання ставиться автоматично (auto_now_add)
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата додавання")
 
     def __str__(self):
-        return f"{self.name} ({self.quantity} шт.)"
+        # Якщо вказана вага, додаємо її до назви (напр. "Гречка 1.00 кг")
+        if self.weight_value and self.weight_unit:
+            # get_weight_unit_display() показує "кг" замість "kg"
+            return f"{self.name} {self.weight_value:g} {self.get_weight_unit_display()}"
+        return f"{self.name}"
 
     class Meta:
         verbose_name = "Товар"
