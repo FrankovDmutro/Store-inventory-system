@@ -1,16 +1,9 @@
 from django.db import models
 from django.utils import timezone
 
-# =======================================================
-# 1. МОДЕЛЬ КАТЕГОРІЇ
-# Відповідає за групи товарів (Електроніка, Їжа тощо)
-# =======================================================
 class Category(models.Model):
-    # CharField - для короткого тексту (назва)
     name = models.CharField(max_length=100, verbose_name="Назва категорії")
 
-    # Цей метод каже Django, як показувати об'єкт текстом.
-    # Замість "Category object (1)" ми побачимо реальну назву.
     def __str__(self):
         return self.name
 
@@ -19,12 +12,7 @@ class Category(models.Model):
         verbose_name_plural = "Категорії"
 
 
-# =======================================================
-# 2. МОДЕЛЬ ТОВАРУ
-# Це головна таблиця нашого складу
-# =======================================================
 class Product(models.Model):
-    # СПИСОК ВАРІАНТІВ ВИМІРУ
     UNIT_CHOICES = [
         ('pcs', 'шт'),
         ('kg', 'кг'),
@@ -34,74 +22,71 @@ class Product(models.Model):
     ]
 
     category = models.ForeignKey(Category, on_delete=models.CASCADE, verbose_name="Категорія")
+    
+    # --- НОВЕ ПОЛЕ: АРТИКУЛ ---
+    sku = models.CharField(max_length=20, verbose_name="Артикул/Код", blank=True, null=True)
+    
     name = models.CharField(max_length=200, verbose_name="Назва товару")
     
-    # --- НОВІ ПОЛЯ ---
-    # 1. Саме число (напр. 0.5 або 100). DecimalField дозволяє дроби (1.5 кг)
-    weight_value = models.DecimalField(
-        max_digits=6, 
-        decimal_places=3, 
-        blank=True, 
-        null=True, 
-        verbose_name="Вага/Об'єм (число)"
-    )
-    
-    # 2. Випадаючий список (кг, л, шт)
-    weight_unit = models.CharField(
-        max_length=10, 
-        choices=UNIT_CHOICES, 
-        default='pcs', 
-        verbose_name="Одиниця виміру"
-    )
-    # -----------------
+    weight_value = models.DecimalField(max_digits=6, decimal_places=3, blank=True, null=True, verbose_name="Вага/Об'єм")
+    weight_unit = models.CharField(max_length=10, choices=UNIT_CHOICES, default='pcs', verbose_name="Одиниця виміру")
 
     description = models.TextField(blank=True, verbose_name="Опис")
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Ціна (грн)")
     
-    # Це залишок на складі (скільки у нас цих пляшок чи пачок)
+    # --- НОВЕ ПОЛЕ: ЦІНА ЗАКУПІВЛІ ---
+    purchase_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Ціна закупівлі (грн)")
+    
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Ціна продажу (грн)")
+    
     quantity = models.PositiveIntegerField(default=0, verbose_name="Кількість на складі")
-    
     image = models.ImageField(upload_to='products/', blank=True, null=True, verbose_name="Фото товару")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата додавання")
 
     def __str__(self):
-        # Якщо вказана вага, додаємо її до назви (напр. "Гречка 1.00 кг")
-        if self.weight_value and self.weight_unit:
-            # get_weight_unit_display() показує "кг" замість "kg"
-            return f"{self.name} {self.weight_value:g} {self.get_weight_unit_display()}"
         return f"{self.name}"
+
+    # Метод, щоб в адмінці показувати маржу (націнку)
+    def margin(self):
+        if self.price and self.purchase_price:
+            return self.price - self.purchase_price
+        return 0
+    margin.short_description = "Прибуток з одиниці"
 
     class Meta:
         verbose_name = "Товар"
         verbose_name_plural = "Товари"
 
 
-# =======================================================
-# 3. МОДЕЛЬ ПРОДАЖУ (ЧЕК)
-# Зберігає історію: що продали, скільки і коли
-# =======================================================
-class Sale(models.Model):
-    # on_delete=models.PROTECT - ЗАХИСТ. 
-    # Не дозволить видалити Товар, якщо він є в історії продажів (щоб не поламався звіт).
-    product = models.ForeignKey(Product, on_delete=models.PROTECT, verbose_name="Товар")
-    
-    quantity = models.PositiveIntegerField(verbose_name="Продана кількість")
-    total_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Загальна сума", blank=True)
-    sale_date = models.DateTimeField(default=timezone.now, verbose_name="Час продажу")
-
-    # === БІЗНЕС-ЛОГІКА ===
-    # Ми переписуємо метод save(), щоб він автоматично рахував суму.
-    def save(self, *args, **kwargs):
-        # Якщо сума не вказана вручну -> рахуємо: Ціна товару * Кількість
-        if not self.total_price:
-            self.total_price = self.product.price * self.quantity
-        
-        # Викликаємо стандартне збереження Django
-        super().save(*args, **kwargs)
+# 1. ГОЛОВНИЙ ЧЕК (Шапка)
+class Order(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення")
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Загальна сума")
+    total_profit = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Загальний прибуток")
 
     def __str__(self):
-        return f"Продаж {self.product.name} | {self.sale_date.strftime('%Y-%m-%d')}"
+        return f"Чек №{self.id} від {self.created_at.strftime('%Y-%m-%d %H:%M')}"
 
     class Meta:
-        verbose_name = "Продаж"
-        verbose_name_plural = "Продажі"
+        verbose_name = "Чек"
+        verbose_name_plural = "Чеки"
+
+
+# 2. ТОВАР У ЧЕКУ (Рядок)
+class OrderItem(models.Model):
+    order = models.ForeignKey(Order, related_name='items', on_delete=models.CASCADE, verbose_name="Чек")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, verbose_name="Товар")
+    
+    quantity = models.DecimalField(max_digits=10, decimal_places=3, verbose_name="Кількість")
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Ціна продажу (за од.)")
+    
+    # Зберігаємо собівартість на момент продажу (щоб якщо ціна зміниться, історія не поламалася)
+    purchase_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Ціна закупівлі")
+    
+    def get_cost(self):
+        return self.price * self.quantity
+
+    def get_profit(self):
+        return (self.price - self.purchase_price) * self.quantity
+
+    def __str__(self):
+        return f"{self.product.name} x {self.quantity}"
