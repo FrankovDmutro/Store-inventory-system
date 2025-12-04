@@ -3,6 +3,7 @@ from django.utils import timezone
 
 class Category(models.Model):
     name = models.CharField(max_length=100, verbose_name="Назва категорії")
+    image = models.ImageField(upload_to='categories/', blank=True, null=True, verbose_name="Зображення")
 
     def __str__(self):
         return self.name
