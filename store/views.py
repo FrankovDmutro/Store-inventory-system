@@ -1,6 +1,8 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from .models import Product, Category, Order, OrderItem 
+from django.http import JsonResponse 
+from django.db.models import Q
 # Зверни увагу: Sale і SaleForm ми прибрали, бо тепер у нас Order
 
 # === 1. ГОЛОВНА: СПИСОК КАТЕГОРІЙ ===
@@ -129,3 +131,42 @@ def cart_checkout(request, category_id):
     
     messages.success(request, f"✅ Чек №{order.id} закрито! Сума: {final_price} грн")
     return redirect('category_detail', category_id=category_id)
+
+# === 6. ПОШУК ТОВАРІВ ===
+def search_products(request):
+    query = request.GET.get('q', '')
+    current_category_id = request.GET.get('category_id')
+    
+    if len(query) < 2:
+        return JsonResponse({'results': []})
+
+    # Шукаємо товари, де назва АБО артикул містять запит
+    products = Product.objects.filter(
+        Q(name__icontains=query) | Q(sku__icontains=query)
+    )
+
+    results_here = []
+    results_others = []
+
+    for p in products:
+        item = {
+            'id': p.id,
+            'name': p.name,
+            'price': float(p.price),
+            'quantity': p.quantity,
+            'sku': p.sku,
+            'image_url': p.image.url if p.image else None,
+            'weight': f"{float(p.weight_value):g} {p.get_weight_unit_display()}" if p.weight_value else "",
+            'category_name': p.category.name
+        }
+        
+        # Розділяємо на "тут" і "там"
+        if str(p.category.id) == str(current_category_id):
+            results_here.append(item)
+        else:
+            results_others.append(item)
+
+    return JsonResponse({
+        'here': results_here,
+        'others': results_others
+    })

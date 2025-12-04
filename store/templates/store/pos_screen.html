@@ -8,177 +8,308 @@
     <style>
         body {
             height: 100vh;
-            overflow: hidden; /* Щоб не було подвійного скролу сторінки */
-        }
-        /* Стиль для карток товарів */
-        .product-card {
-            cursor: pointer;
-            transition: transform 0.2s, border-color 0.2s;
-            border: 1px solid #eee;
-        }
-        .product-card:hover {
-            transform: scale(1.03); /* Трохи збільшується */
-            border-color: #0d6efd;    /* Синя рамка */
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        
-        /* Права панель (Чек) */
-        .cart-panel {
-            height: 100vh;
-            background-color: #fff;
-            border-left: 2px solid #e9ecef;
             display: flex;
             flex-direction: column;
-            box-shadow: -5px 0 15px rgba(0,0,0,0.05);
-            z-index: 1000;
-        }
-        
-        /* Ліва панель (Товари) - скролиться окремо */
-        .products-panel {
-            height: 100vh;
-            overflow-y: auto;
-            padding: 20px;
-            background-color: #f8f9fa;
+            overflow: hidden; /* Щоб не було скролу на все вікно */
+            background-color: #f0f2f5;
         }
 
-        /* Таблиця в чеку */
-        .cart-table-container {
-            flex-grow: 1; /* Розтягується на вільне місце */
-            overflow-y: auto;
+        /* === ВЕРХНЯ ПАНЕЛЬ (NAVBAR) === */
+        .navbar-custom {
+            background-color: #fff;
+            border-bottom: 1px solid #ddd;
+            padding: 10px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            z-index: 1050;
+            flex-shrink: 0; /* Не стискається */
         }
+
+        /* === ГОЛОВНИЙ КОНТЕЙНЕР (Сітка) === */
+        .main-layout {
+            display: flex;
+            flex-grow: 1; /* Займає всю решту висоти */
+            overflow: hidden;
+        }
+
+        /* === ЛІВА КОЛОНКА (Товари) === */
+        .products-section {
+            flex: 1; /* Займає весь вільний простір */
+            overflow-y: auto; /* Скрол тільки тут */
+            padding: 20px;
+        }
+
+        .product-card {
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid #eee;
+            background: white;
+            border-radius: 12px;
+        }
+        .product-card:hover {
+            transform: translateY(-3px);
+            border-color: #0d6efd;
+            box-shadow: 0 5px 15px rgba(13, 110, 253, 0.15);
+        }
+
+        /* === ПРАВА КОЛОНКА (Чек) === */
+        .cart-section {
+            width: 400px; /* Фіксована ширина */
+            background-color: #fff;
+            border-left: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -5px 0 20px rgba(0,0,0,0.03);
+            z-index: 1040;
+        }
+
+        .cart-header {
+            padding: 15px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+        }
+
+        .cart-items {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        .cart-footer {
+            padding: 20px;
+            background: #fff;
+            border-top: 2px solid #f0f0f0;
+        }
+
+        /* Гарні скролбари */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #bbb; }
     </style>
 </head>
-<body>
+<body data-category-id="{{ category.id }}">
 
-<div class="container-fluid">
-    <div class="row">
+<div class="navbar-custom d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-3">
+        <a href="{% url 'category_list' %}" class="btn btn-outline-dark d-flex align-items-center gap-2">
+            <span>🔙</span> Меню
+        </a>
+        <h4 class="m-0 text-primary border-start ps-3 ms-2">{{ category.name }}</h4>
+    </div>
+
+    <div class="input-group" style="max-width: 500px;">
+        <span class="input-group-text bg-white border-end-0">🔎</span>
+        <input type="text" id="searchInput" class="form-control border-start-0 shadow-none" placeholder="Пошук товару (назва або код)..." autocomplete="off">
+    </div>
+    
+    <div class="text-muted small">Касир: <strong>Admin</strong></div>
+</div>
+
+<div class="main-layout">
+    
+    <div class="products-section">
         
-        <div class="col-md-8 products-panel">
-            <div class="d-flex justify-content-between align-items-center mb-4 sticky-top bg-light py-2" style="z-index: 100;">
-                <a href="{% url 'category_list' %}" class="btn btn-outline-secondary">⬅ Назад до категорій</a>
-                <h2 class="m-0 text-primary">{{ category.name }}</h2>
-            </div>
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
 
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-
-            <div class="row">
-                {% for product in products %}
-                <div class="col-md-3 mb-4">
-                    <a href="{% url 'cart_add' product.id %}" class="text-decoration-none text-dark">
-                        <div class="card product-card h-100">
-                            {% if product.image %}
-                                <img src="{{ product.image.url }}" class="card-img-top" style="height: 140px; object-fit: cover;">
-                            {% else %}
-                                <div class="bg-secondary text-white d-flex align-items-center justify-content-center" style="height: 140px;">
-                                    <small>Немає фото</small>
-                                </div>
-                            {% endif %}
-                            
-                            <div class="card-body p-2 text-center">
-                                <h6 class="card-title fw-bold mb-1 text-truncate">{{ product.name }}</h6>
-                                
-                                <p class="mb-1 text-muted small">
-                                    {% if product.weight_value %}
-                                        {{ product.weight_value|floatformat }} {{ product.get_weight_unit_display }}
-                                    {% endif %}
-                                    {% if product.sku %}
-                                        <br><span style="font-size: 0.8em">Код: {{ product.sku }}</span>
-                                    {% endif %}
-                                </p>
-
-                                <div class="d-flex justify-content-between align-items-center mt-2 px-2">
-                                    <span class="h5 mb-0 text-primary">{{ product.price }} ₴</span>
-                                    <span class="badge {% if product.quantity > 5 %}bg-success{% elif product.quantity > 0 %}bg-warning text-dark{% else %}bg-danger{% endif %} rounded-pill">
-                                        {{ product.quantity }} шт
-                                    </span>
-                                </div>
+        <div class="row g-3" id="defaultProducts">
+            {% for product in products %}
+            <div class="col-md-4 col-lg-3 col-xl-3">
+                <a href="{% url 'cart_add' product.id %}" class="text-decoration-none text-dark">
+                    <div class="card product-card h-100">
+                        {% if product.image %}
+                            <img src="{{ product.image.url }}" class="card-img-top" style="height: 120px; object-fit: contain; padding: 10px;">
+                        {% else %}
+                            <div class="bg-light text-secondary d-flex align-items-center justify-content-center" style="height: 120px;">
+                                <small>📷 Немає фото</small>
+                            </div>
+                        {% endif %}
+                        <div class="card-body p-2 text-center border-top">
+                            <h6 class="card-title fw-bold mb-1 text-truncate" title="{{ product.name }}">{{ product.name }}</h6>
+                            <div class="d-flex justify-content-center gap-2 mb-2">
+                                <span class="badge bg-light text-dark border">{{ product.sku|default:"-" }}</span>
+                                <span class="badge bg-light text-dark border">
+                                    {% if product.weight_value %}{{ product.weight_value|floatformat }} {{ product.get_weight_unit_display }}{% endif %}
+                                </span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-2 px-1">
+                                <span class="h5 mb-0 text-primary">{{ product.price }} ₴</span>
+                                <span class="badge {% if product.quantity > 5 %}bg-success{% else %}bg-danger{% endif %} rounded-pill">
+                                    {{ product.quantity }} шт
+                                </span>
                             </div>
                         </div>
-                    </a>
-                </div>
-                {% empty %}
-                <div class="col-12 text-center mt-5">
-                    <h4 class="text-muted">Тут поки пусто 🕸️</h4>
-                    <p>Додайте товари в адмінці</p>
-                </div>
-                {% endfor %}
+                    </div>
+                </a>
             </div>
+            {% empty %}
+            <div class="col-12 text-center mt-5">
+                <h3 class="text-muted">Тут пусто 🕸️</h3>
+            </div>
+            {% endfor %}
         </div>
 
-        <div class="col-md-4 cart-panel p-4">
-            <h3 class="d-flex justify-content-between align-items-center mb-3">
-                <span>🧾 Чек</span>
-                <span class="badge bg-primary rounded-pill">{{ cart_items|length }} поз.</span>
-            </h3>
+        <div id="searchResults" style="display: none;">
+            <h5 class="text-success mb-3">Знайдено в цій категорії:</h5>
+            <div class="row g-3 mb-4" id="resultsHere"></div>
+            <hr>
+            <h5 class="text-muted mb-3">З інших відділів:</h5>
+            <div class="row g-3" id="resultsOthers"></div>
+        </div>
 
-            <div class="cart-table-container border-top border-bottom">
+    </div>
+
+    <div class="cart-section">
+        <div class="cart-header d-flex justify-content-between align-items-center">
+            <h5 class="m-0">🧾 Поточний чек</h5>
+            <span class="badge bg-primary rounded-pill">{{ cart_items|length }} поз.</span>
+        </div>
+
+        <div class="cart-items">
+            {% if cart_items %}
+                <table class="table table-hover mb-0" style="font-size: 0.95rem;">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th class="ps-3">Товар</th>
+                            <th class="text-center">К-сть</th>
+                            <th class="text-end pe-3">Сума</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in cart_items %}
+                        <tr>
+                            <td class="ps-3 align-middle">
+                                <div class="fw-bold text-truncate" style="max-width: 130px;">{{ item.product.name }}</div>
+                                <small class="text-muted">{{ item.product.price }} ₴</small>
+                            </td>
+                            <td class="text-center align-middle">
+                                <span class="badge bg-secondary rounded-pill">x{{ item.quantity }}</span>
+                            </td>
+                            <td class="text-end pe-3 align-middle fw-bold">
+                                {{ item.total }} ₴
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
+                    <div style="font-size: 4rem; opacity: 0.3;">🛒</div>
+                    <p class="mt-2">Кошик пустий</p>
+                    <small>Натисніть на товар зліва</small>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="cart-footer">
+            <div class="d-flex justify-content-between align-items-end mb-3">
+                <span class="h5 mb-0 text-muted">До сплати:</span>
+                <span class="display-6 fw-bold text-success">{{ cart_total_price }} ₴</span>
+            </div>
+            <div class="d-grid gap-2">
                 {% if cart_items %}
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light sticky-top">
-                            <tr>
-                                <th>Товар</th>
-                                <th class="text-center">К-сть</th>
-                                <th class="text-end">Сума</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in cart_items %}
-                            <tr>
-                                <td>
-                                    <span class="fw-bold">{{ item.product.name }}</span><br>
-                                    <small class="text-muted">{{ item.product.price }} ₴/од.</small>
-                                </td>
-                                <td class="text-center align-middle">
-                                    <span class="badge bg-secondary">x{{ item.quantity }}</span>
-                                </td>
-                                <td class="text-end align-middle fw-bold">
-                                    {{ item.total }} ₴
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                    <a href="{% url 'cart_checkout' category.id %}" class="btn btn-success btn-lg fw-bold shadow-sm">
+                        ✅ ОПЛАТИТИ
+                    </a>
+                    <a href="{% url 'cart_clear' category.id %}" class="btn btn-outline-danger">
+                        🗑 Очистити
+                    </a>
                 {% else %}
-                    <div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
-                        <div style="font-size: 3rem;">🛒</div>
-                        <p class="mt-2">Кошик пустий</p>
-                        <small>Клікніть на товар зліва</small>
-                    </div>
+                    <button class="btn btn-secondary btn-lg" disabled>Очікування...</button>
                 {% endif %}
             </div>
-
-            <div class="mt-3">
-                <div class="d-flex justify-content-between align-items-end mb-3">
-                    <span class="h5 mb-0">До сплати:</span>
-                    <span class="display-6 fw-bold text-success">{{ cart_total_price }} ₴</span>
-                </div>
-
-                <div class="d-grid gap-2">
-                    {% if cart_items %}
-                        <a href="{% url 'cart_checkout' category.id %}" class="btn btn-success btn-lg py-3 fw-bold shadow-sm">
-                            ✅ ОПЛАТИТИ (Закрити чек)
-                        </a>
-                        <a href="{% url 'cart_clear' category.id %}" class="btn btn-outline-danger">
-                            🗑 Очистити кошик
-                        </a>
-                    {% else %}
-                        <button class="btn btn-secondary btn-lg py-3" disabled>Очікування товарів...</button>
-                    {% endif %}
-                </div>
-            </div>
         </div>
-
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('searchInput');
+        const defaultProducts = document.getElementById('defaultProducts');
+        const searchResults = document.getElementById('searchResults');
+        const resultsHere = document.getElementById('resultsHere');
+        const resultsOthers = document.getElementById('resultsOthers');
+        
+        // ID категорії беремо з body
+        const currentCategoryId = document.body.dataset.categoryId;
+
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const query = this.value.trim();
+
+                // Якщо пошук пустий (менше 2 букв)
+                if (query.length < 2) {
+                    defaultProducts.style.display = 'flex'; // flex для row
+                    searchResults.style.display = 'none';
+                    return;
+                }
+
+                // Якщо щось ввели
+                defaultProducts.style.display = 'none';
+                searchResults.style.display = 'block';
+
+                // Запит на сервер
+                fetch(`/api/search/?q=${query}&category_id=${currentCategoryId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        resultsHere.innerHTML = '';
+                        resultsOthers.innerHTML = '';
+
+                        function createCard(product, isOther = false) {
+                            const imgHtml = product.image_url 
+                                ? `<img src="${product.image_url}" class="card-img-top" style="height: 120px; object-fit: contain; padding: 10px;">`
+                                : `<div class="bg-light text-secondary d-flex align-items-center justify-content-center" style="height: 120px;"><small>📷 Без фото</small></div>`;
+
+                            const badgeClass = product.quantity > 5 ? 'bg-success' : 'bg-danger';
+                            
+                            // Лейбл іншої категорії
+                            const catBadge = isOther 
+                                ? `<div class="position-absolute top-0 start-0 m-2"><span class="badge bg-warning text-dark border">${product.category_name}</span></div>` 
+                                : '';
+
+                            return `
+                            <div class="col-md-4 col-lg-3 col-xl-3">
+                                <a href="/cart/add/${product.id}/" class="text-decoration-none text-dark">
+                                    <div class="card product-card h-100 position-relative">
+                                        ${catBadge}
+                                        ${imgHtml}
+                                        <div class="card-body p-2 text-center border-top">
+                                            <h6 class="card-title fw-bold mb-1 text-truncate">${product.name}</h6>
+                                            <div class="d-flex justify-content-center gap-2 mb-2">
+                                                <span class="badge bg-light text-dark border">${product.sku || '-'}</span>
+                                                <span class="badge bg-light text-dark border">${product.weight}</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center mt-2 px-1">
+                                                <span class="h5 mb-0 text-primary">${product.price} ₴</span>
+                                                <span class="badge ${badgeClass} rounded-pill">${product.quantity} шт</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                            `;
+                        }
+
+                        // Малюємо результати
+                        if (data.here.length > 0) data.here.forEach(p => resultsHere.innerHTML += createCard(p));
+                        else resultsHere.innerHTML = '<div class="col-12 text-center text-muted py-3">Немає збігів у цій папці</div>';
+
+                        if (data.others.length > 0) data.others.forEach(p => resultsOthers.innerHTML += createCard(p, true));
+                        else resultsOthers.innerHTML = '<div class="col-12 text-center text-muted py-3">В інших відділах теж пусто</div>';
+                    })
+                    .catch(error => console.error('Помилка пошуку:', error));
+            });
+        }
+    });
+</script>
 
 </body>
 </html>
