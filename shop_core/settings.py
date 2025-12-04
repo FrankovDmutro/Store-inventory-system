@@ -111,9 +111,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'uk'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Europe/Kyiv'
 
 USE_I18N = True
 
@@ -138,3 +138,12 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 import os
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Якщо користувач не авторизований, його перекине сюди
+LOGIN_URL = '/accounts/login/'
+
+# Після входу його перекине на головну, а там наш "перемикач" розбереться
+LOGIN_REDIRECT_URL = '/'
+
+# Після виходу - на логін
+LOGOUT_REDIRECT_URL = '/accounts/login/'

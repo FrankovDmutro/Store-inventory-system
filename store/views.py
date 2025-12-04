@@ -3,14 +3,17 @@ from django.contrib import messages
 from .models import Product, Category, Order, OrderItem 
 from django.http import JsonResponse 
 from django.db.models import Q
+from django.contrib.auth.decorators import login_required
 # Зверни увагу: Sale і SaleForm ми прибрали, бо тепер у нас Order
 
 # === 1. ГОЛОВНА: СПИСОК КАТЕГОРІЙ ===
+@login_required
 def category_list(request):
     categories = Category.objects.all()
     return render(request, 'store/category_list.html', {'categories': categories})
 
 # === 2. ЕКРАН КАСИРА (ТОВАРИ + КОШИК) ===
+@login_required
 def category_detail(request, category_id):
     category = get_object_or_404(Category, id=category_id)
     products = Product.objects.filter(category=category)
@@ -46,35 +49,36 @@ def category_detail(request, category_id):
     return render(request, 'store/pos_screen.html', context)
 
 # === 3. ДОДАТИ В КОШИК (КЛІК ПО ТОВАРУ) ===
+# === ПРОСТА ФУНКЦІЯ ДОДАВАННЯ (БЕЗ AJAX) ===
+@login_required
 def cart_add(request, product_id):
-    # Отримуємо кошик
     cart = request.session.get('cart', {})
-    
-    # JSON у сесіях працює з ключами-стрічками, тому ID переводимо в str
     str_id = str(product_id)
-    
     product = get_object_or_404(Product, id=product_id)
     
-    # Скільки вже в кошику?
     current_in_cart = cart.get(str_id, 0)
     
-    # Перевірка: чи не хочемо ми продати більше, ніж є на складі?
+    # Логіка додавання
     if current_in_cart + 1 <= product.quantity:
         cart[str_id] = current_in_cart + 1
-        request.session['cart'] = cart # Зберігаємо зміни в браузері
+        request.session['cart'] = cart
+        # Показуємо повідомлення користувачу
+        messages.success(request, f"Додано: {product.name}")
     else:
-        messages.error(request, f"На складі всього {product.quantity} шт. товару {product.name}!")
+        messages.error(request, f"Мало товару на складі!")
 
-    # Повертаємось на ту саму сторінку
+    # Просто повертаємось на ту саму сторінку категорії
     return redirect('category_detail', category_id=product.category.id)
 
 # === 4. ОЧИСТИТИ КОШИК ===
+@login_required
 def cart_clear(request, category_id):
     if 'cart' in request.session:
         del request.session['cart']
     return redirect('category_detail', category_id=category_id)
 
 # === 5. ОФОРМИТИ ЧЕК (ВЕЛИКА КНОПКА "ОПЛАТИТИ") ===
+@login_required
 def cart_checkout(request, category_id):
     cart = request.session.get('cart', {})
     
@@ -133,6 +137,7 @@ def cart_checkout(request, category_id):
     return redirect('category_detail', category_id=category_id)
 
 # === 6. ПОШУК ТОВАРІВ ===
+@login_required
 def search_products(request):
     query = request.GET.get('q', '')
     current_category_id = request.GET.get('category_id')

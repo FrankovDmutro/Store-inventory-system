@@ -10,100 +10,97 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow: hidden; /* Щоб не було скролу на все вікно */
-            background-color: #f0f2f5;
+            overflow: hidden;
+            background-color: #f4f6f8;
         }
 
-        /* === ВЕРХНЯ ПАНЕЛЬ (NAVBAR) === */
-        .navbar-custom {
-            background-color: #fff;
+        /* === HEADER === */
+        .pos-header {
+            background: white;
+            height: 70px;
             border-bottom: 1px solid #ddd;
-            padding: 10px 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            z-index: 1050;
-            flex-shrink: 0; /* Не стискається */
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            flex-shrink: 0;
+            justify-content: space-between;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.03);
         }
 
-        /* === ГОЛОВНИЙ КОНТЕЙНЕР (Сітка) === */
+        /* === LAYOUT === */
         .main-layout {
             display: flex;
-            flex-grow: 1; /* Займає всю решту висоти */
+            flex-grow: 1;
             overflow: hidden;
         }
 
-        /* === ЛІВА КОЛОНКА (Товари) === */
+        /* === ТОВАРИ (ЛІВО) === */
         .products-section {
-            flex: 1; /* Займає весь вільний простір */
-            overflow-y: auto; /* Скрол тільки тут */
+            flex: 1;
+            overflow-y: auto;
             padding: 20px;
         }
 
         .product-card {
-            cursor: pointer;
             transition: all 0.2s;
             border: 1px solid #eee;
             background: white;
             border-radius: 12px;
+            color: #212529; /* Чорний текст */
         }
         .product-card:hover {
             transform: translateY(-3px);
             border-color: #0d6efd;
             box-shadow: 0 5px 15px rgba(13, 110, 253, 0.15);
+            text-decoration: none; /* Прибираємо підкреслення */
         }
 
-        /* === ПРАВА КОЛОНКА (Чек) === */
+        /* === ЧЕК (ПРАВО) === */
         .cart-section {
-            width: 400px; /* Фіксована ширина */
+            width: 420px;
             background-color: #fff;
             border-left: 1px solid #ddd;
             display: flex;
             flex-direction: column;
-            box-shadow: -5px 0 20px rgba(0,0,0,0.03);
-            z-index: 1040;
+            z-index: 100;
+            box-shadow: -5px 0 20px rgba(0,0,0,0.05);
         }
 
-        .cart-header {
-            padding: 15px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #eee;
-        }
-
-        .cart-items {
+        .cart-items-container {
             flex-grow: 1;
             overflow-y: auto;
-            padding: 0;
         }
 
         .cart-footer {
             padding: 20px;
             background: #fff;
-            border-top: 2px solid #f0f0f0;
+            border-top: 1px solid #eee;
         }
-
-        /* Гарні скролбари */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #bbb; }
     </style>
 </head>
-<body data-category-id="{{ category.id }}">
+<body>
 
-<div class="navbar-custom d-flex justify-content-between align-items-center">
+<header class="pos-header">
     <div class="d-flex align-items-center gap-3">
-        <a href="{% url 'category_list' %}" class="btn btn-outline-dark d-flex align-items-center gap-2">
-            <span>🔙</span> Меню
-        </a>
-        <h4 class="m-0 text-primary border-start ps-3 ms-2">{{ category.name }}</h4>
+        <a href="{% url 'category_list' %}" class="btn btn-outline-dark fw-bold">⬅ Меню</a>
+        <h5 class="m-0 text-primary">{{ category.name }}</h5>
     </div>
 
-    <div class="input-group" style="max-width: 500px;">
-        <span class="input-group-text bg-white border-end-0">🔎</span>
-        <input type="text" id="searchInput" class="form-control border-start-0 shadow-none" placeholder="Пошук товару (назва або код)..." autocomplete="off">
+    <div class="text-muted small mx-4">
+        <span class="d-none d-md-inline">🛒 POS Система</span>
     </div>
-    
-    <div class="text-muted small">Касир: <strong>Admin</strong></div>
-</div>
+
+    <div class="d-flex align-items-center gap-3">
+        <div class="text-end lh-sm">
+            <div class="small text-muted">Касир</div>
+            <div class="fw-bold">{{ user.username }}</div>
+        </div>
+        <form action="{% url 'logout' %}" method="post" class="m-0">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-light text-danger border" title="Вихід">🚪</button>
+        </form>
+    </div>
+</header>
 
 <div class="main-layout">
     
@@ -118,22 +115,22 @@
             {% endfor %}
         {% endif %}
 
-        <div class="row g-3" id="defaultProducts">
+        <div class="row g-3">
             {% for product in products %}
             <div class="col-md-4 col-lg-3 col-xl-3">
-                <a href="{% url 'cart_add' product.id %}" class="text-decoration-none text-dark">
+                <a href="{% url 'cart_add' product.id %}" class="text-decoration-none">
                     <div class="card product-card h-100">
                         {% if product.image %}
-                            <img src="{{ product.image.url }}" class="card-img-top" style="height: 120px; object-fit: contain; padding: 10px;">
+                            <img src="{{ product.image.url }}" class="card-img-top" style="height: 130px; object-fit: contain; padding: 10px;">
                         {% else %}
-                            <div class="bg-light text-secondary d-flex align-items-center justify-content-center" style="height: 120px;">
-                                <small>📷 Немає фото</small>
+                            <div class="bg-light text-secondary d-flex align-items-center justify-content-center" style="height: 130px;">
+                                <small>📷 Без фото</small>
                             </div>
                         {% endif %}
+                        
                         <div class="card-body p-2 text-center border-top">
-                            <h6 class="card-title fw-bold mb-1 text-truncate" title="{{ product.name }}">{{ product.name }}</h6>
+                            <h6 class="card-title fw-bold mb-1 text-truncate text-dark">{{ product.name }}</h6>
                             <div class="d-flex justify-content-center gap-2 mb-2">
-                                <span class="badge bg-light text-dark border">{{ product.sku|default:"-" }}</span>
                                 <span class="badge bg-light text-dark border">
                                     {% if product.weight_value %}{{ product.weight_value|floatformat }} {{ product.get_weight_unit_display }}{% endif %}
                                 </span>
@@ -149,77 +146,59 @@
                 </a>
             </div>
             {% empty %}
-            <div class="col-12 text-center mt-5">
-                <h3 class="text-muted">Тут пусто 🕸️</h3>
-            </div>
+            <div class="col-12 text-center mt-5"><h3 class="text-muted">Тут пусто 🕸️</h3></div>
             {% endfor %}
         </div>
-
-        <div id="searchResults" style="display: none;">
-            <h5 class="text-success mb-3">Знайдено в цій категорії:</h5>
-            <div class="row g-3 mb-4" id="resultsHere"></div>
-            <hr>
-            <h5 class="text-muted mb-3">З інших відділів:</h5>
-            <div class="row g-3" id="resultsOthers"></div>
-        </div>
-
     </div>
 
     <div class="cart-section">
-        <div class="cart-header d-flex justify-content-between align-items-center">
-            <h5 class="m-0">🧾 Поточний чек</h5>
+        <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+            <h5 class="m-0">🧾 Чек</h5>
             <span class="badge bg-primary rounded-pill">{{ cart_items|length }} поз.</span>
         </div>
 
-        <div class="cart-items">
-            {% if cart_items %}
-                <table class="table table-hover mb-0" style="font-size: 0.95rem;">
-                    <thead class="table-light sticky-top">
-                        <tr>
-                            <th class="ps-3">Товар</th>
-                            <th class="text-center">К-сть</th>
-                            <th class="text-end pe-3">Сума</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in cart_items %}
-                        <tr>
-                            <td class="ps-3 align-middle">
-                                <div class="fw-bold text-truncate" style="max-width: 130px;">{{ item.product.name }}</div>
-                                <small class="text-muted">{{ item.product.price }} ₴</small>
-                            </td>
-                            <td class="text-center align-middle">
-                                <span class="badge bg-secondary rounded-pill">x{{ item.quantity }}</span>
-                            </td>
-                            <td class="text-end pe-3 align-middle fw-bold">
-                                {{ item.total }} ₴
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            {% else %}
-                <div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
-                    <div style="font-size: 4rem; opacity: 0.3;">🛒</div>
-                    <p class="mt-2">Кошик пустий</p>
-                    <small>Натисніть на товар зліва</small>
-                </div>
-            {% endif %}
+        <div class="cart-items-container">
+            <table class="table table-hover mb-0" style="font-size: 0.9rem;">
+                <thead class="table-light sticky-top">
+                    <tr>
+                        <th class="ps-3">Товар</th>
+                        <th class="text-center">К-сть</th>
+                        <th class="text-end pe-3">Сума</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in cart_items %}
+                    <tr>
+                        <td class="ps-3">
+                            <div class="fw-bold text-truncate" style="max-width: 150px;">{{ item.product.name }}</div>
+                            <small class="text-muted">{{ item.product.price }} ₴</small>
+                        </td>
+                        <td class="text-center align-middle">
+                            <span class="badge bg-secondary">x{{ item.quantity }}</span>
+                        </td>
+                        <td class="text-end pe-3 align-middle fw-bold">{{ item.total }} ₴</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="text-center py-5 text-muted">
+                            <div style="font-size: 3rem; opacity: 0.3;">🛒</div>
+                            <p class="mt-2">Кошик пустий</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
 
         <div class="cart-footer">
             <div class="d-flex justify-content-between align-items-end mb-3">
                 <span class="h5 mb-0 text-muted">До сплати:</span>
-                <span class="display-6 fw-bold text-success">{{ cart_total_price }} ₴</span>
+                <span class="display-5 fw-bold text-success">{{ cart_total_price }} ₴</span>
             </div>
             <div class="d-grid gap-2">
                 {% if cart_items %}
-                    <a href="{% url 'cart_checkout' category.id %}" class="btn btn-success btn-lg fw-bold shadow-sm">
-                        ✅ ОПЛАТИТИ
-                    </a>
-                    <a href="{% url 'cart_clear' category.id %}" class="btn btn-outline-danger">
-                        🗑 Очистити
-                    </a>
+                    <a href="{% url 'cart_checkout' category.id %}" class="btn btn-success btn-lg fw-bold shadow-sm">✅ ОПЛАТИТИ</a>
+                    <a href="{% url 'cart_clear' category.id %}" class="btn btn-outline-danger">🗑 Очистити</a>
                 {% else %}
                     <button class="btn btn-secondary btn-lg" disabled>Очікування...</button>
                 {% endif %}
@@ -229,87 +208,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const searchInput = document.getElementById('searchInput');
-        const defaultProducts = document.getElementById('defaultProducts');
-        const searchResults = document.getElementById('searchResults');
-        const resultsHere = document.getElementById('resultsHere');
-        const resultsOthers = document.getElementById('resultsOthers');
-        
-        // ID категорії беремо з body
-        const currentCategoryId = document.body.dataset.categoryId;
-
-        if (searchInput) {
-            searchInput.addEventListener('input', function() {
-                const query = this.value.trim();
-
-                // Якщо пошук пустий (менше 2 букв)
-                if (query.length < 2) {
-                    defaultProducts.style.display = 'flex'; // flex для row
-                    searchResults.style.display = 'none';
-                    return;
-                }
-
-                // Якщо щось ввели
-                defaultProducts.style.display = 'none';
-                searchResults.style.display = 'block';
-
-                // Запит на сервер
-                fetch(`/api/search/?q=${query}&category_id=${currentCategoryId}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        resultsHere.innerHTML = '';
-                        resultsOthers.innerHTML = '';
-
-                        function createCard(product, isOther = false) {
-                            const imgHtml = product.image_url 
-                                ? `<img src="${product.image_url}" class="card-img-top" style="height: 120px; object-fit: contain; padding: 10px;">`
-                                : `<div class="bg-light text-secondary d-flex align-items-center justify-content-center" style="height: 120px;"><small>📷 Без фото</small></div>`;
-
-                            const badgeClass = product.quantity > 5 ? 'bg-success' : 'bg-danger';
-                            
-                            // Лейбл іншої категорії
-                            const catBadge = isOther 
-                                ? `<div class="position-absolute top-0 start-0 m-2"><span class="badge bg-warning text-dark border">${product.category_name}</span></div>` 
-                                : '';
-
-                            return `
-                            <div class="col-md-4 col-lg-3 col-xl-3">
-                                <a href="/cart/add/${product.id}/" class="text-decoration-none text-dark">
-                                    <div class="card product-card h-100 position-relative">
-                                        ${catBadge}
-                                        ${imgHtml}
-                                        <div class="card-body p-2 text-center border-top">
-                                            <h6 class="card-title fw-bold mb-1 text-truncate">${product.name}</h6>
-                                            <div class="d-flex justify-content-center gap-2 mb-2">
-                                                <span class="badge bg-light text-dark border">${product.sku || '-'}</span>
-                                                <span class="badge bg-light text-dark border">${product.weight}</span>
-                                            </div>
-                                            <div class="d-flex justify-content-between align-items-center mt-2 px-1">
-                                                <span class="h5 mb-0 text-primary">${product.price} ₴</span>
-                                                <span class="badge ${badgeClass} rounded-pill">${product.quantity} шт</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </a>
-                            </div>
-                            `;
-                        }
-
-                        // Малюємо результати
-                        if (data.here.length > 0) data.here.forEach(p => resultsHere.innerHTML += createCard(p));
-                        else resultsHere.innerHTML = '<div class="col-12 text-center text-muted py-3">Немає збігів у цій папці</div>';
-
-                        if (data.others.length > 0) data.others.forEach(p => resultsOthers.innerHTML += createCard(p, true));
-                        else resultsOthers.innerHTML = '<div class="col-12 text-center text-muted py-3">В інших відділах теж пусто</div>';
-                    })
-                    .catch(error => console.error('Помилка пошуку:', error));
-            });
-        }
-    });
-</script>
 
 </body>
 </html>
