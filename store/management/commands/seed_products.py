@@ -1,16 +1,16 @@
 import random
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from django.core.management.base import BaseCommand
-from store.models import Product, Category
+from store.models import Product, Category, Supplier, Order, OrderItem, Purchase, PurchaseItem
 from faker import Faker
 
+
 class Command(BaseCommand):
-    help = 'Генерує тестові товари для магазину'
+    help = 'Очищає старі товари і генерує нові тестові товари по категоріях'
 
     def handle(self, *args, **kwargs):
-        fake = Faker('uk_UA')  # Українська мова
-        
-        # 1. Створюємо базові категорії, якщо їх немає
+        fake = Faker('uk_UA')
+
         categories_data = {
             'Напої': ['Кола', 'Фанта', 'Спрайт', 'Сік', 'Вода', 'Енергетик', 'Чай', 'Кава'],
             'Снеки': ['Чіпси', 'Сухарики', 'Горішки', 'Попкорн', 'Шоколадка', 'Печиво'],
@@ -19,60 +19,56 @@ class Command(BaseCommand):
             'Фрукти': ['Яблуко', 'Банан', 'Апельсин', 'Лимон', 'Груша']
         }
 
-        self.stdout.write("Починаю генерацію...")
+        self.stdout.write(self.style.WARNING("⚠️ Видаляю старі дані (чеки, поставки, товари)..."))
+        OrderItem.objects.all().delete()
+        Order.objects.all().delete()
+        PurchaseItem.objects.all().delete()
+        Purchase.objects.all().delete()
+        Product.objects.all().delete()
+
+        self.stdout.write("Починаю генерацію категорій і товарів...")
         total_created = 0
 
         for cat_name, product_names in categories_data.items():
-            # get_or_create повертає кортеж (об'єкт, чи_створено)
-            category, created = Category.objects.get_or_create(name=cat_name)
-            
-            if created:
-                self.stdout.write(f"Створено категорію: {cat_name}")
+            category, _ = Category.objects.get_or_create(name=cat_name)
 
-            # Генеруємо по 1-3 різновидів кожного товару
+            # Підтягнемо постачальників, що прив’язані до цієї категорії (може бути порожньо)
+            cat_suppliers = list(category.suppliers.all())
+
             for prod_base_name in product_names:
-                for _ in range(random.randint(1, 3)):
-                    
-                    # Випадкові параметри
+                for _ in range(random.randint(2, 4)):
                     if cat_name == 'Напої':
-                        weight_opts = [
-                            (Decimal('0.5'), 'l'),
-                            (Decimal('1.0'), 'l'),
-                            (Decimal('2.0'), 'l')
-                        ]
+                        weight_opts = [(Decimal('0.5'), 'l'), (Decimal('1.0'), 'l'), (Decimal('2.0'), 'l')]
                     elif cat_name == 'Фрукти':
-                        weight_opts = [
-                            (Decimal('0.5'), 'kg'),
-                            (Decimal('1.0'), 'kg')
-                        ]
+                        weight_opts = [(Decimal('0.5'), 'kg'), (Decimal('1.0'), 'kg')]
                     else:
-                        weight_opts = [
-                            (Decimal('100'), 'g'),
-                            (Decimal('200'), 'g'),
-                            (Decimal('1'), 'kg')
-                        ]
-                    
-                    w_val, w_unit = random.choice(weight_opts)
-                    
-                    full_name = f"{prod_base_name} {w_val}{w_unit} '{fake.company()}'"
-                    
-                    sku = fake.ean8()  # Штрихкод
-                    purchase_price = Decimal(str(random.randint(10, 200)))
-                    price = purchase_price * Decimal(str(random.uniform(1.2, 1.5)))  # Націнка 20-50%
-                    quantity = Decimal(str(random.randint(0, 100)))
+                        weight_opts = [(Decimal('100'), 'g'), (Decimal('200'), 'g'), (Decimal('1'), 'kg')]
 
-                    # Створюємо товар
+                    w_val, w_unit = random.choice(weight_opts)
+                    full_name = f"{prod_base_name} {w_val}{w_unit} '{fake.company()}""'"
+                    sku = fake.ean8()
+
+                    purchase_price = Decimal(random.randint(10, 200)).quantize(Decimal('0.01'))
+                    price = (purchase_price * Decimal(str(random.uniform(1.20, 1.50)))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    if price < purchase_price:
+                        price = (purchase_price * Decimal('1.25')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+                    quantity = Decimal(random.randint(0, 120))
+
+                    supplier = random.choice(cat_suppliers) if cat_suppliers else None
+
                     Product.objects.create(
                         category=category,
+                        supplier=supplier,
                         name=full_name,
                         sku=sku,
                         weight_value=w_val,
                         weight_unit=w_unit,
                         purchase_price=purchase_price,
-                        price=round(price, 2),
+                        price=price,
                         quantity=quantity,
-                        description=fake.text(max_nb_chars=50)
+                        description=fake.text(max_nb_chars=60)
                     )
                     total_created += 1
-        
+
         self.stdout.write(self.style.SUCCESS(f'✅ Успішно додано {total_created} товарів!'))
