@@ -5,13 +5,30 @@
     <title>Категорії | Каса</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
+        body { min-height: 100vh; background-color: #f4f6f8; display: flex; flex-direction: column; }
+        .pos-header { height: 60px; background: white; border-bottom: 1px solid #ddd; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
         .hover-shadow:hover { transform: translateY(-3px); transition: 0.3s; box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; }
     </style>
 </head>
-<body class="bg-light">
+<body>
+
+{% csrf_token %}
+
+<div class="pos-header">
+    <div style="width: 200px;">
+    </div>
+    <div style="flex: 1; text-align: center;">
+        <h5 class="mb-0 fw-bold text-primary">📂 Виберіть категорію</h5>
+    </div>
+    <div style="width: 200px; text-align: right;">
+        <span class="fw-bold me-2">{{ user.username }}</span>
+        <form action="{% url 'logout' %}" method="post" style="display:inline;">{% csrf_token %}
+            <button class="btn btn-sm btn-danger">🚪</button>
+        </form>
+    </div>
+</div>
 
 <div class="container mt-5">
-    <h1 class="text-center mb-5">📂 Виберіть категорію</h1>
 
     <div class="row">
         {% for category in categories %}
