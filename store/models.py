@@ -1,8 +1,29 @@
-from django.db import models
+from django.db import models, transaction
+from django.db.models import F
 from django.utils import timezone
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 from decimal import Decimal
+
+
+class Supplier(models.Model):
+    name = models.CharField(max_length=200, verbose_name="Постачальник")
+    email = models.EmailField(blank=True, null=True, verbose_name="Email")
+    phone = models.CharField(max_length=30, blank=True, null=True, verbose_name="Телефон")
+    address = models.CharField(max_length=255, blank=True, null=True, verbose_name="Адреса")
+    notes = models.TextField(blank=True, null=True, verbose_name="Нотатки")
+
+    # Які категорії товарів зазвичай постачає
+    categories = models.ManyToManyField('Category', blank=True, related_name='suppliers', verbose_name="Категорії")
+
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Створено")
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Постачальник"
+        verbose_name_plural = "Постачальники"
 
 class Category(models.Model):
     name = models.CharField(max_length=100, verbose_name="Назва категорії")
@@ -26,6 +47,7 @@ class Product(models.Model):
     ]
 
     category = models.ForeignKey(Category, on_delete=models.CASCADE, verbose_name="Категорія")
+    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, blank=True, null=True, related_name='products', verbose_name="Постачальник")
     
     # --- НОВЕ ПОЛЕ: АРТИКУЛ ---
     sku = models.CharField(max_length=20, verbose_name="Артикул/Код", blank=True, null=True)
@@ -89,6 +111,68 @@ class Product(models.Model):
     class Meta:
         verbose_name = "Товар"
         verbose_name_plural = "Товари"
+
+
+class Purchase(models.Model):
+    STATUS_CHOICES = [
+        ('draft', 'Чернетка'),
+        ('ordered', 'Замовлено'),
+        ('received', 'Отримано'),
+        ('cancelled', 'Скасовано'),
+    ]
+
+    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, related_name='purchases', verbose_name="Постачальник")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name="Статус")
+    expected_date = models.DateTimeField(blank=True, null=True, verbose_name="Очікувана дата")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Створено")
+    total_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0, validators=[MinValueValidator(Decimal('0.00'))], verbose_name="Загальна сума")
+    received_applied = models.BooleanField(default=False, verbose_name="Проведено на склад")
+
+    def __str__(self):
+        return f"Поставка #{self.id} від {self.supplier.name}"
+
+    def recalc_total(self):
+        total = Decimal('0')
+        for item in self.items.all():
+            total += item.quantity * item.unit_cost
+        self.total_cost = total
+        return total
+
+    def apply_to_stock_once(self):
+        """Якщо статус 'received' і ще не проведено — додаємо залишки по товарах."""
+        if self.received_applied:
+            return
+        with transaction.atomic():
+            for item in self.items.select_related('product'):
+                Product.objects.filter(id=item.product_id).update(quantity=F('quantity') + item.quantity)
+            self.received_applied = True
+            self.save(update_fields=['received_applied'])
+
+    class Meta:
+        verbose_name = "Поставка"
+        verbose_name_plural = "Поставки"
+
+
+class PurchaseItem(models.Model):
+    purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name='items', verbose_name="Поставка")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, verbose_name="Товар")
+    quantity = models.DecimalField(max_digits=10, decimal_places=3, validators=[MinValueValidator(Decimal('0.001'))], verbose_name="Кількість")
+    unit_cost = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))], verbose_name="Ціна за од.")
+
+    def line_total(self):
+        return self.quantity * self.unit_cost
+
+    def clean(self):
+        super().clean()
+        if self.quantity <= 0:
+            raise ValidationError({'quantity': 'Кількість має бути більшою за 0'})
+
+    def __str__(self):
+        return f"{self.product.name} x {self.quantity}"
+
+    class Meta:
+        verbose_name = "Позиція поставки"
+        verbose_name_plural = "Позиції поставки"
 
 
 # 1. ГОЛОВНИЙ ЧЕК (Шапка)

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Category, Product, Order, OrderItem
+from .models import Category, Product, Order, OrderItem, Supplier, Purchase, PurchaseItem
 
 # === КАТЕГОРІЇ ===
 class CategoryAdmin(admin.ModelAdmin):
@@ -96,3 +96,44 @@ class ProductAdmin(admin.ModelAdmin):
 admin.site.register(Category, CategoryAdmin)
 admin.site.register(Product, ProductAdmin)
 admin.site.register(Order, OrderAdmin)
+
+
+# === ПОСТАЧАЛЬНИКИ ===
+class SupplierAdmin(admin.ModelAdmin):
+    list_display = ['name', 'phone', 'email', 'categories_list', 'created_at']
+    search_fields = ['name', 'phone', 'email']
+    list_filter = ['categories']
+
+    def categories_list(self, obj):
+        return ", ".join([c.name for c in obj.categories.all()]) or '-'
+    categories_list.short_description = 'Категорії'
+
+
+# === ПОЗИЦІЇ В ПОСТАВЦІ (inline) ===
+class PurchaseItemInline(admin.TabularInline):
+    model = PurchaseItem
+    raw_id_fields = ['product']
+    extra = 0
+
+
+# === ПОСТАВКИ ===
+class PurchaseAdmin(admin.ModelAdmin):
+    list_display = ['id', 'supplier', 'status', 'expected_date', 'total_cost', 'created_at']
+    list_filter = ['status', 'supplier']
+    date_hierarchy = 'created_at'
+    readonly_fields = ['created_at', 'total_cost']
+    inlines = [PurchaseItemInline]
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        # після збереження рядків перерахувати суму
+        purchase = form.instance
+        purchase.recalc_total()
+        purchase.save(update_fields=['total_cost'])
+        # миттєве зарахування при статусі "Отримано"
+        if purchase.status == 'received' and not purchase.received_applied:
+            purchase.apply_to_stock_once()
+
+
+admin.site.register(Supplier, SupplierAdmin)
+admin.site.register(Purchase, PurchaseAdmin)
