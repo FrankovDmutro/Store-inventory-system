@@ -13,5 +13,9 @@ db.sqlite3
 media/
 !media/.gitkeep
 
+# Logs
+logs/*.log
+!logs/.gitkeep
+
 .vscode/
 .idea/

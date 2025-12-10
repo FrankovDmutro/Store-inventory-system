@@ -1,130 +1,214 @@
 from django.shortcuts import render, get_object_or_404, redirect
+from django.http import JsonResponse
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q, F
+from django.db import transaction
+from decimal import Decimal, InvalidOperation
+import logging
 from .models import Product, Category, Order, OrderItem
 
-# === 1. ГОЛОВНА: СПИСОК КАТЕГОРІЙ ===
+logger = logging.getLogger(__name__)
+
+@login_required
 def category_list(request):
     categories = Category.objects.all()
     return render(request, 'store/category_list.html', {'categories': categories})
 
-# === 2. ЕКРАН КАСИРА (ТОВАРИ + КОШИК) ===
+@login_required
 def category_detail(request, category_id):
     category = get_object_or_404(Category, id=category_id)
-    products = Product.objects.filter(category=category)
-
-    # Отримуємо кошик із сесії (якщо його немає - буде пустий словник)
-    cart = request.session.get('cart', {}) 
+    products = Product.objects.filter(category=category).select_related('category')
     
-    # Підготовка даних для відображення кошика справа
+    # Отримуємо кошик для початкового завантаження
+    cart = request.session.get('cart', {})
     cart_items = []
-    cart_total_price = 0
+    cart_total_price = Decimal('0')
     
-    for product_id, quantity in cart.items():
-        # Шукаємо товар, якщо його раптом видалили - пропускаємо
+    for pid, qty in cart.items():
         try:
-            product = Product.objects.get(id=product_id)
-            total = product.price * quantity
+            p = Product.objects.get(id=pid)
+            qty_decimal = Decimal(str(qty))
+            total = p.price * qty_decimal
             cart_total_price += total
-            cart_items.append({
-                'product': product,
-                'quantity': quantity,
-                'total': total
-            })
-        except Product.DoesNotExist:
+            cart_items.append({'product': p, 'quantity': float(qty_decimal), 'total': total})
+        except (Product.DoesNotExist, ValueError, InvalidOperation):
             continue
 
-    context = {
+    return render(request, 'store/pos_screen.html', {
         'category': category,
         'products': products,
         'cart_items': cart_items,
         'cart_total_price': cart_total_price
-    }
-    # Використовуємо новий шаблон POS-терміналу
-    return render(request, 'store/pos_screen.html', context)
+    })
 
-# === 3. ДОДАТИ В КОШИК (КЛІК ПО ТОВАРУ) ===
+# === ГІБРИДНА ФУНКЦІЯ ДОДАВАННЯ (AJAX + звичайна) ===
+@login_required
 def cart_add(request, product_id):
-    # Отримуємо кошик
-    cart = request.session.get('cart', {})
-    
-    # JSON у сесіях працює з ключами-стрічками, тому ID переводимо в str
-    str_id = str(product_id)
-    
-    product = get_object_or_404(Product, id=product_id)
-    
-    # Скільки вже в кошику?
-    current_in_cart = cart.get(str_id, 0)
-    
-    # Перевірка: чи не хочемо ми продати більше, ніж є на складі?
-    if current_in_cart + 1 <= product.quantity:
-        cart[str_id] = current_in_cart + 1
-        request.session['cart'] = cart # Зберігаємо зміни в браузері
-    else:
-        messages.error(request, f"На складі всього {product.quantity} шт. товару {product.name}!")
+    try:
+        cart = request.session.get('cart', {})
+        str_id = str(product_id)
+        product = get_object_or_404(Product, id=product_id)
+        
+        # Конвертуємо в Decimal для точних обчислень
+        current_qty = Decimal(str(cart.get(str_id, 0)))
+        
+        # Перевірка наявності товару
+        if current_qty + 1 <= product.quantity:
+            cart[str_id] = float(current_qty + 1)
+            request.session['cart'] = cart
+            request.session.modified = True
+            status = 'success'
+            message = f"Додано: {product.name}"
+        else:
+            status = 'error'
+            message = "Недостатньо товару на складі!"
 
-    # Повертаємось на ту саму сторінку
-    return redirect('category_detail', category_id=product.category.id)
+        # Якщо це AJAX-запит (від JavaScript) -> повертаємо JSON
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            # Перераховуємо кошик
+            items_data = []
+            total_price = Decimal('0')
+            for pid, qty in cart.items():
+                try:
+                    p = Product.objects.get(id=pid)
+                    qty_decimal = Decimal(str(qty))
+                    t = p.price * qty_decimal
+                    total_price += t
+                    items_data.append({
+                        'id': p.id,
+                        'name': p.name,
+                        'price': float(p.price),
+                        'qty': float(qty_decimal),
+                        'total': float(t)
+                    })
+                except (Product.DoesNotExist, ValueError, InvalidOperation) as e:
+                    logger.warning(f"Error processing cart item {pid}: {e}")
+                    continue
+                
+            return JsonResponse({
+                'status': status,
+                'message': message,
+                'added_id': int(product_id),
+                'cart_total': float(total_price),
+                'cart_count': len(items_data),
+                'cart_items': items_data
+            })
 
-# === 4. ОЧИСТИТИ КОШИК ===
+        # Якщо JS вимкнено -> звичайний редірект
+        if status == 'error':
+            messages.error(request, message)
+        return redirect('category_detail', category_id=product.category.id)
+    except Exception as e:
+        logger.error(f"Error in cart_add: {e}")
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'error', 'message': 'Виникла помилка. Спробуйте ще раз.'})
+        messages.error(request, 'Виникла помилка при додаванні товару.')
+        return redirect('category_list')
+
+# === ПОШУК ===
+@login_required
+def search_products(request):
+    query = request.GET.get('q', '').strip()
+    cat_id = request.GET.get('category_id')
+    
+    if len(query) < 1:
+        return JsonResponse({'here': [], 'others': []})
+
+    try:
+        products = Product.objects.filter(
+            Q(name__icontains=query) | Q(sku__icontains=query)
+        ).select_related('category')[:50]  # Обмежуємо результати
+        
+        res_here = []
+        res_others = []
+
+        for p in products:
+            weight_display = ""
+            if p.weight_value:
+                weight_display = f"{p.weight_value:g} {p.get_weight_unit_display()}"
+            
+            item = {
+                'id': p.id,
+                'name': p.name,
+                'price': float(p.price),
+                'quantity': float(p.quantity),
+                'sku': p.sku or '',
+                'image_url': p.image.url if p.image else None,
+                'weight': weight_display,
+                'category_name': p.category.name
+            }
+            if str(p.category.id) == str(cat_id):
+                res_here.append(item)
+            else:
+                res_others.append(item)
+
+        return JsonResponse({'here': res_here, 'others': res_others})
+    except Exception as e:
+        logger.error(f"Error in search_products: {e}")
+        return JsonResponse({'here': [], 'others': [], 'error': 'Помилка пошуку'})
+
+@login_required
 def cart_clear(request, category_id):
     if 'cart' in request.session:
         del request.session['cart']
+        request.session.modified = True
+        messages.info(request, 'Кошик очищено.')
     return redirect('category_detail', category_id=category_id)
 
-# === 5. ОФОРМИТИ ЧЕК (ВЕЛИКА КНОПКА "ОПЛАТИТИ") ===
+@login_required
 def cart_checkout(request, category_id):
     cart = request.session.get('cart', {})
-    
     if not cart:
-        messages.error(request, "Кошик пустий!")
+        messages.warning(request, 'Кошик порожній!')
         return redirect('category_detail', category_id=category_id)
 
-    # 1. Створюємо "Шапку" чека
-    order = Order.objects.create()
-    
-    final_price = 0
-    final_profit = 0
-    
-    # 2. Проходимо по кошику і переносимо товари в базу
-    for product_id, quantity in cart.items():
-        try:
-            product = Product.objects.get(id=product_id)
-        except Product.DoesNotExist:
-            continue
-        
-        # Фінальна перевірка наявності (раптом хтось вкрав товар, поки ми думали)
-        if product.quantity >= quantity:
-            item_total = product.price * quantity
-            # Рахуємо прибуток: (Ціна продажу - Собівартість) * Кількість
-            # purchase_price ми додали в модель Product минулого кроку
-            item_profit = (product.price - product.purchase_price) * quantity
+    try:
+        with transaction.atomic():
+            order = Order.objects.create()
+            total = Decimal('0')
+            profit = Decimal('0')
             
-            # Створюємо рядок у чеку
-            OrderItem.objects.create(
-                order=order,
-                product=product,
-                quantity=quantity,
-                price=product.price,
-                purchase_price=product.purchase_price
-            )
+            for pid, qty in cart.items():
+                try:
+                    # Блокування рядка для запобігання конкурентних оновлень
+                    p = Product.objects.select_for_update().get(id=pid)
+                    qty_decimal = Decimal(str(qty))
+                    
+                    # Перевірка наявності
+                    if p.quantity >= qty_decimal:
+                        OrderItem.objects.create(
+                            order=order,
+                            product=p,
+                            quantity=qty_decimal,
+                            price=p.price,
+                            purchase_price=p.purchase_price
+                        )
+                        # Використання F() для атомарного оновлення
+                        Product.objects.filter(id=p.id).update(
+                            quantity=F('quantity') - qty_decimal
+                        )
+                        total += p.price * qty_decimal
+                        profit += (p.price - p.purchase_price) * qty_decimal
+                    else:
+                        logger.warning(f"Insufficient quantity for product {p.id}: {p.quantity} < {qty_decimal}")
+                        messages.warning(request, f"Товар '{p.name}' відсутній у потрібній кількості")
+                except (Product.DoesNotExist, ValueError, InvalidOperation) as e:
+                    logger.error(f"Error processing product {pid}: {e}")
+                    continue
             
-            # Списуємо зі складу
-            product.quantity -= quantity
-            product.save()
+            order.total_price = total
+            order.total_profit = profit
+            order.save()
             
-            # Плюсуємо загальну касу
-            final_price += item_total
-            final_profit += item_profit
-        else:
-            messages.error(request, f"Товар {product.name} закінчився під час оформлення!")
-    
-    # 3. Записуємо підсумки в чек
-    order.total_price = final_price
-    order.total_profit = final_profit
-    order.save()
-    
-    # 4. Очищаємо кошик після успішного продажу
-    del request.session['cart']
-    
-    messages.success(request, f"✅ Чек №{order.id} закрито! Сума: {final_price} грн")
-    return redirect('category_detail', category_id=category_id)
+            # Очищення кошика
+            del request.session['cart']
+            request.session.modified = True
+            
+            messages.success(request, f"Чек №{order.id} успішно закрито! Сума: {total} ₴")
+            return redirect('category_detail', category_id=category_id)
+            
+    except Exception as e:
+        logger.error(f"Error in cart_checkout: {e}")
+        messages.error(request, 'Виникла помилка при оформленні чеку. Спробуйте ще раз.')
+        return redirect('category_detail', category_id=category_id)
