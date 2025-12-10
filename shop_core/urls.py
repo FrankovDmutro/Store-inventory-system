@@ -1,27 +1,33 @@
-"""
-URL configuration for shop_core project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.shortcuts import redirect
+
+# === ФУНКЦІЯ-РЕГУЛЮВАЛЬНИК ===
+def root_redirect(request):
+    # 1. Якщо не авторизований -> на сторінку входу
+    if not request.user.is_authenticated:
+        return redirect('login')
+    
+    # 2. Якщо це Суперюзер (Власник) -> в Адмінку
+    if request.user.is_superuser:
+        return redirect('/admin/')
+    
+    # 3. Всі інші (Касири) -> на сторінку категорій
+    return redirect('category_list')
 
 urlpatterns = [
+    # Головна сторінка ('') викликає нашу функцію
+    path('', root_redirect, name='root'),
+    
     path('admin/', admin.site.urls),
-    path('', include('store.urls')),
+    
+    # Система акаунтів (Login/Logout) - ОБОВ'ЯЗКОВО!
+    path('accounts/', include('django.contrib.auth.urls')),
+    
+    # Наш магазин
+    path('store/', include('store.urls')), 
 ]
 
 if settings.DEBUG:

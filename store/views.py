@@ -1,7 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
-from .models import Product, Category, Order, OrderItem 
-# Зверни увагу: Sale і SaleForm ми прибрали, бо тепер у нас Order
+from .models import Product, Category, Order, OrderItem
 
 # === 1. ГОЛОВНА: СПИСОК КАТЕГОРІЙ ===
 def category_list(request):

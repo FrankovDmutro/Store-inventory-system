@@ -1,4 +1,2 @@
-from django import forms
-
-class SaleForm(forms.Form):
-    quantity = forms.IntegerField(min_value=1, label="Кількість")
+# This file is kept for future form extensions
+# Current forms are handled via Django admin or session-based cart

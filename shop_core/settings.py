@@ -78,13 +78,13 @@ WSGI_APPLICATION = 'shop_core.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-'default': {
+    'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'shop_db',     
+        'NAME': 'shop_db',
         'USER': 'root',
-        'PASSWORD': '31242090', 
+        'PASSWORD': '31242090',
         'HOST': '127.0.0.1',
-        'PORT': '3307',          
+        'PORT': '3307',
     }
 }
 
@@ -111,9 +111,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'uk'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Europe/Kyiv'
 
 USE_I18N = True
 
@@ -138,3 +138,14 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 import os
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# === НАЛАШТУВАННЯ ВХОДУ ===
+LOGIN_URL = '/accounts/login/'
+LOGIN_REDIRECT_URL = '/'  # Після входу кидаємо на головну (а там розберемося)
+LOGOUT_REDIRECT_URL = '/accounts/login/' # Після виходу - на логін
+
+# === НАЛАШТУВАННЯ СЕСІЇ ===
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to cookies
+SESSION_COOKIE_AGE = 3600  # 1 hour timeout
