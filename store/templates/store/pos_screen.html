@@ -59,7 +59,7 @@
         <h4 class="mb-3 text-primary" id="catTitle">{{ category.name }}</h4>
         
         <div class="row g-3" id="productsGrid">
-            {% for p in products %}
+            {% for p in products_in_stock %}
             <div class="col-md-3">
                 <div class="product-card add-btn" data-id="{{ p.id }}">
                     {% if p.image %}
@@ -71,11 +71,33 @@
                         <div class="fw-bold text-truncate">{{ p.name }}</div>
                         <small class="text-muted d-block">{{ p.sku|default:"" }}</small>
                         <div class="fw-bold text-primary mt-1">{{ p.price }} ₴</div>
-                        <span class="badge {% if p.quantity > 0 %}bg-success{% else %}bg-danger{% endif %} rounded-pill">{% if p.quantity|floatformat:0 == p.quantity|stringformat:"f" %}{{ p.quantity|floatformat:0 }}{% else %}{{ p.quantity|floatformat:1 }}{% endif %} шт</span>
+                        <span class="badge bg-success rounded-pill">{{ p.quantity|floatformat:0|add:"0" }} шт</span>
                     </div>
                 </div>
             </div>
             {% endfor %}
+            
+            {% if products_out_of_stock %}
+            <div class="col-12"><hr class="my-3"><h5 class="text-muted text-center">❌ Немає на складі</h5><hr class="my-3"></div>
+            
+            {% for p in products_out_of_stock %}
+            <div class="col-md-3">
+                <div class="product-card add-btn opacity-75" data-id="{{ p.id }}">
+                    {% if p.image %}
+                        <img src="{{ p.image.url }}" style="height: 120px; object-fit: contain; width: 100%; padding: 10px;">
+                    {% else %}
+                        <div class="d-flex align-items-center justify-content-center text-muted" style="height: 120px; background: #f8f9fa;">📷</div>
+                    {% endif %}
+                    <div class="p-2 text-center border-top">
+                        <div class="fw-bold text-truncate">{{ p.name }}</div>
+                        <small class="text-muted d-block">{{ p.sku|default:"" }}</small>
+                        <div class="fw-bold text-primary mt-1">{{ p.price }} ₴</div>
+                        <span class="badge bg-danger rounded-pill">0 шт</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
         </div>
     </div>
 
@@ -216,7 +238,12 @@
                     return; 
                 }
 
-                all.forEach(p => {
+                // Розділяємо товари на наявні та відсутні
+                const inStock = all.filter(p => parseFloat(p.quantity) > 0);
+                const outOfStock = all.filter(p => parseFloat(p.quantity) <= 0);
+                
+                // Спочатку показуємо товари в наявності
+                inStock.forEach(p => {
                     const imgHtml = p.image_url ? 
                         `<img src="${p.image_url}" style="height: 120px; object-fit: contain; width: 100%; padding: 10px;">` : 
                         `<div class="d-flex align-items-center justify-content-center text-muted" style="height: 120px; background: #f8f9fa;">📷</div>`;
@@ -231,11 +258,37 @@
                                 <div class="fw-bold text-truncate">${escapeHtml(p.name)}</div>
                                 <small class="text-muted d-block">${escapeHtml(p.sku)} ${escapeHtml(p.weight)}</small>
                                 <div class="fw-bold text-primary mt-1">${parseFloat(p.price).toFixed(2)} ₴</div>
-                                <span class="badge bg-success rounded-pill">${p.quantity % 1 === 0 ? parseInt(p.quantity) : parseFloat(p.quantity).toFixed(1)} шт</span>
+                                <span class="badge bg-success rounded-pill">${Math.round(p.quantity)} шт</span>
                             </div>
                         </div>
                     </div>`;
                 });
+                
+                // Якщо є товари без залишків - показуємо роздільник
+                if (outOfStock.length > 0) {
+                    grid.innerHTML += '<div class="col-12"><hr class="my-3"><h5 class="text-muted text-center">❌ Немає на складі</h5><hr class="my-3"></div>';
+                    
+                    outOfStock.forEach(p => {
+                        const imgHtml = p.image_url ? 
+                            `<img src="${p.image_url}" style="height: 120px; object-fit: contain; width: 100%; padding: 10px;">` : 
+                            `<div class="d-flex align-items-center justify-content-center text-muted" style="height: 120px; background: #f8f9fa;">📷</div>`;
+                        const badge = (p.category_name) ? 
+                            `<span class="badge bg-warning text-dark position-absolute top-0 start-0 m-2">${escapeHtml(p.category_name)}</span>` : '';
+                        
+                        grid.innerHTML += `
+                        <div class="col-md-3">
+                            <div class="product-card add-btn position-relative opacity-75" data-id="${p.id}">
+                                ${badge} ${imgHtml}
+                                <div class="p-2 text-center border-top">
+                                    <div class="fw-bold text-truncate">${escapeHtml(p.name)}</div>
+                                    <small class="text-muted d-block">${escapeHtml(p.sku)} ${escapeHtml(p.weight)}</small>
+                                    <div class="fw-bold text-primary mt-1">${parseFloat(p.price).toFixed(2)} ₴</div>
+                                    <span class="badge bg-danger rounded-pill">0 шт</span>
+                                </div>
+                            </div>
+                        </div>`;
+                    });
+                }
             })
             .catch(error => {
                 console.error('Error:', error);

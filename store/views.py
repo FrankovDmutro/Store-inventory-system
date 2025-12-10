@@ -18,7 +18,15 @@ def category_list(request):
 @login_required
 def category_detail(request, category_id):
     category = get_object_or_404(Category, id=category_id)
-    products = Product.objects.filter(category=category).select_related('category')
+    
+    # Розділяємо товари на наявні та відсутні
+    products_in_stock = Product.objects.filter(
+        category=category, quantity__gt=0
+    ).select_related('category').order_by('name')
+    
+    products_out_of_stock = Product.objects.filter(
+        category=category, quantity__lte=0
+    ).select_related('category').order_by('name')
     
     # Отримуємо кошик для початкового завантаження
     cart = request.session.get('cart', {})
@@ -37,7 +45,8 @@ def category_detail(request, category_id):
 
     return render(request, 'store/pos_screen.html', {
         'category': category,
-        'products': products,
+        'products_in_stock': products_in_stock,
+        'products_out_of_stock': products_out_of_stock,
         'cart_items': cart_items,
         'cart_total_price': cart_total_price
     })
