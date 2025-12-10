@@ -28,6 +28,8 @@
 </head>
 <body data-cat-id="{{ category.id }}">
 
+{% csrf_token %}
+
 <div class="pos-header">
     <div style="width: 200px;">
         <a href="{% url 'category_list' %}" class="btn btn-outline-dark fw-bold btn-sm">⬅ Меню</a>
@@ -101,35 +103,63 @@
         </div>
     </div>
 
+    <!-- КОШИК -->
     <div class="cart-area">
-        <div class="p-3 bg-light border-bottom d-flex justify-content-between">
-            <h5 class="m-0">🧾 Чек</h5>
-            <span class="badge bg-primary" id="cartCount">{{ cart_items|length }}</span>
+        <div style="padding: 20px; border-bottom: 1px solid #eee;">
+            <h5 class="mb-0">🛒 КОШИК</h5>
         </div>
         <div class="cart-list">
-            <table class="table table-hover mb-0" style="font-size: 0.9rem;">
-                <thead class="table-light sticky-top"><tr><th class="ps-3">Товар</th><th class="text-center">К-сть</th><th class="text-end pe-3">Сума</th></tr></thead>
-                <tbody id="cartTable">
-                    {% for item in cart_items %}
-                    <tr>
-                        <td class="ps-3"><div class="text-truncate fw-bold" style="max-width: 140px;">{{ item.product.name }}</div><small class="text-muted">{{ item.product.price }} ₴</small></td>
-                        <td class="text-center align-middle"><span class="badge bg-secondary">x{{ item.quantity }}</span></td>
-                        <td class="text-end pe-3 align-middle fw-bold">{{ item.total }} ₴</td>
-                    </tr>
-                    {% empty %}
-                    <tr id="emptyRow"><td colspan="3" class="text-center py-5 text-muted">Кошик пустий</td></tr>
-                    {% endfor %}
-                </tbody>
+            <table class="table table-sm table-hover mb-0" id="cartTable">
+                <tr id="emptyRow"><td colspan="3" class="text-center py-5 text-muted">Кошик пустий</td></tr>
             </table>
         </div>
         <div class="cart-footer">
-            <div class="d-flex justify-content-between align-items-end mb-3">
-                <span class="h5 m-0 text-muted">Разом:</span>
-                <span class="h2 m-0 text-success fw-bold" id="cartTotal">{{ cart_total_price }} ₴</span>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                <span class="fw-bold">РАЗОМ:</span>
+                <span class="fw-bold text-primary" id="cartTotal" style="font-size: 1.2rem;">0.00 ₴</span>
             </div>
-            <div class="d-grid gap-2">
-                <a href="{% url 'cart_checkout' category.id %}" class="btn btn-success fw-bold py-2">✅ ОПЛАТИТИ</a>
-                <a href="{% url 'cart_clear' category.id %}" class="btn btn-outline-danger">🗑 Очистити</a>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-secondary flex-grow-1" onclick="location.reload()">🔄 Скинути</button>
+                <button class="btn btn-success btn-lg flex-grow-1" data-bs-toggle="modal" data-bs-target="#paymentModal">💰 Оплата</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- МОДАЛЬ ОПЛАТИ -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">💳 Оплата за товари</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Сума до сплати:</label>
+                    <div class="alert alert-info mb-0">
+                        <h4 class="mb-0" id="totalAmount">0.00 ₴</h4>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="cashInput" class="form-label fw-bold">Готівка отримана (₴):</label>
+                    <input type="number" class="form-control form-control-lg" id="cashInput" placeholder="0.00" min="0" step="0.01">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Здача до видачі:</label>
+                    <div class="alert" id="changeAlert" style="display: none;">
+                        <h4 class="mb-0" id="changeAmount">0.00 ₴</h4>
+                    </div>
+                    <div id="noChangeAlert" class="alert alert-warning" style="display: none;">
+                        Будь ласка, введіть суму готівки
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                <button type="button" class="btn btn-success btn-lg" id="confirmPaymentBtn">✅ Завершити оплату</button>
             </div>
         </div>
     </div>
@@ -155,11 +185,17 @@
 
             // Відправка запиту
             fetch(`/store/cart/add/${pid}/`, { 
-                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
                 credentials: 'same-origin'
             })
-            .then(res => {
-                if (!res.ok) throw new Error('Network response was not ok');
+            .then(async res => {
+                const contentType = res.headers.get('content-type') || '';
+                if (!res.ok || !contentType.includes('application/json')) {
+                    throw new Error(`Unexpected response: ${res.status}`);
+                }
                 return res.json();
             })
             .then(data => {
@@ -171,14 +207,17 @@
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Виникла помилка. Спробуйте ще раз.');
+                // Фолбек: якщо JSON не прийшов або мережа впала — робимо звичайний перехід
+                window.location.href = `/store/cart/add/${pid}/`;
             });
         }
     });
 
     function updateCartUI(data) {
         cartTotal.innerText = parseFloat(data.cart_total).toFixed(2) + ' ₴';
-        cartCount.innerText = data.cart_count;
+        if (cartCount) {
+            cartCount.innerText = data.cart_count;
+        }
         
         let html = '';
         data.cart_items.forEach(item => {
@@ -208,7 +247,101 @@
         return text.replace(/[&<>"']/g, m => map[m]);
     }
 
-    // 2. ПОШУК (AJAX)
+    // 3. ОПЛАТА ЧЕРЕЗ МОДАЛЬ
+    const paymentModal = document.getElementById('paymentModal');
+    const cashInput = document.getElementById('cashInput');
+    const totalAmount = document.getElementById('totalAmount');
+    const changeAmount = document.getElementById('changeAmount');
+    const changeAlert = document.getElementById('changeAlert');
+    const noChangeAlert = document.getElementById('noChangeAlert');
+    const confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
+    
+    // Показуємо модаль при натисканні на кнопку оплати
+    paymentModal.addEventListener('show.bs.modal', function() {
+        // Встановлюємо суму до сплати
+        totalAmount.textContent = parseFloat(cartTotal.textContent).toFixed(2) + ' ₴';
+        // Очищаємо поле введення
+        cashInput.value = '';
+        cashInput.focus();
+        updateChange();
+    });
+    
+    // Розрахунок здачи при введенні готівки
+    cashInput.addEventListener('input', updateChange);
+    
+    function updateChange() {
+        const total = parseFloat(cartTotal.textContent) || 0;
+        const cash = parseFloat(cashInput.value) || 0;
+        
+        if (cash === 0 || isNaN(cash) || cashInput.value === '') {
+            changeAlert.style.display = 'none';
+            noChangeAlert.style.display = 'block';
+            confirmPaymentBtn.disabled = true;
+            return;
+        }
+        
+        const change = cash - total;
+        noChangeAlert.style.display = 'none';
+        
+        if (change < 0) {
+            // Не вистачає готівки
+            changeAlert.innerHTML = `<h4 class="mb-0 text-danger">Не вистачає: ${Math.abs(change).toFixed(2)} ₴</h4>`;
+            changeAlert.className = 'alert alert-danger';
+            changeAlert.style.display = 'block';
+            confirmPaymentBtn.disabled = true;
+        } else {
+            // Достатньо готівки - показуємо здачу
+            changeAmount.textContent = change.toFixed(2) + ' ₴';
+            changeAlert.className = 'alert alert-success';
+            changeAlert.innerHTML = `<h4 class="mb-0" id="changeAmount">${change.toFixed(2)} ₴</h4>`;
+            changeAlert.style.display = 'block';
+            confirmPaymentBtn.disabled = false;
+        }
+    }
+    
+    // Завершення оплати
+    confirmPaymentBtn.addEventListener('click', function() {
+        const total = parseFloat(cartTotal.textContent) || 0;
+        const cash = parseFloat(cashInput.value) || 0;
+        const change = cash - total;
+        
+        if (change < 0) {
+            alert('Не вистачає готівки!');
+            return;
+        }
+        
+        // Закриваємо модаль
+        const modal = bootstrap.Modal.getInstance(paymentModal);
+        modal.hide();
+        
+        // Виконуємо checkout в фоні
+        fetch(`/store/cart/checkout/${catId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            credentials: 'same-origin'
+        })
+        .then(res => res.json())
+        .catch(error => {
+            console.error('Error:', error);
+        })
+        .finally(() => {
+            // Зберігаємо дані про успішний платіж в localStorage
+            localStorage.setItem('paymentSuccess', JSON.stringify({
+                total: total.toFixed(2),
+                cash: cash.toFixed(2),
+                change: change.toFixed(2),
+                timestamp: new Date().toLocaleTimeString('uk-UA')
+            }));
+            
+            // Редіректимо на категорії
+            window.location.href = `{% url "category_list" %}`;
+        });
+    });
+
+    // 4. ПОШУК ТОВАРІВ
     let searchTimeout;
     document.getElementById('searchInput').addEventListener('input', function(e) {
         const q = e.target.value.trim();

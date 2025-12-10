@@ -169,6 +169,8 @@ def cart_clear(request, category_id):
 def cart_checkout(request, category_id):
     cart = request.session.get('cart', {})
     if not cart:
+        if request.method == 'POST' and request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'error', 'message': 'Кошик порожній!'}, status=400)
         messages.warning(request, 'Кошик порожній!')
         return redirect('category_detail', category_id=category_id)
 
@@ -214,8 +216,16 @@ def cart_checkout(request, category_id):
             del request.session['cart']
             request.session.modified = True
             
-            messages.success(request, f"Чек №{order.id} успішно закрито! Сума: {total} ₴")
-            return redirect('category_detail', category_id=category_id)
+            # Відповідь залежить від типу запиту
+            if request.method == 'POST' and request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'status': 'success',
+                    'order_id': order.id,
+                    'total': float(total)
+                })
+            
+            # Для звичайного запиту - редірект без messages
+            return redirect('category_list')
             
     except Exception as e:
         logger.error(f"Error in cart_checkout: {e}")

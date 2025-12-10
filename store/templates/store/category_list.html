@@ -44,5 +44,49 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // Перевіряємо, чи є дані про успішну оплату в localStorage
+    const paymentSuccess = localStorage.getItem('paymentSuccess');
+    
+    if (paymentSuccess) {
+        try {
+            // Парсимо дані про оплату
+            const paymentData = JSON.parse(paymentSuccess);
+            
+            // Показуємо центральне повідомлення
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'position-fixed top-50 start-50 translate-middle';
+            alertDiv.style.zIndex = '9999';
+            alertDiv.style.width = '500px';
+            alertDiv.style.textAlign = 'center';
+            alertDiv.innerHTML = `
+                <div class="alert alert-success alert-dismissible fade show" role="alert" style="font-size: 1.2rem;">
+                    <h4 class="alert-heading">✅ Оплата успішна!</h4>
+                    <hr>
+                    <p class="mb-1"><strong>Сума:</strong> ${paymentData.total} ₴</p>
+                    <p class="mb-1"><strong>Готівка:</strong> ${paymentData.cash} ₴</p>
+                    <p class="mb-3"><strong>Здача:</strong> <span class="text-success fw-bold">${paymentData.change} ₴</span></p>
+                    <p class="mb-0"><small class="text-muted">${paymentData.timestamp}</small></p>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            document.body.appendChild(alertDiv);
+            
+            // Видаляємо з localStorage після використання
+            localStorage.removeItem('paymentSuccess');
+            
+            // Автоматичне закриття через 3 секунди
+            setTimeout(() => {
+                const alert = new bootstrap.Alert(alertDiv.querySelector('.alert'));
+                alert.close();
+            }, 3000);
+        } catch (e) {
+            console.error('Error parsing payment data:', e);
+        }
+    }
+</script>
+
 </body>
 </html>
