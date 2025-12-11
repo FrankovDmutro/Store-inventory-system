@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Менеджерська панель</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f5f7fb; }
+        .card { border: none; box-shadow: 0 6px 20px rgba(0,0,0,0.05); }
+        .stat-value { font-size: 2rem; font-weight: 700; }
+    </style>
+</head>
+<body>
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="mb-0">📊 Менеджерська панель</h3>
+        <div>
+            <a href="{% url 'category_list' %}" class="btn btn-outline-secondary btn-sm me-2">⬅ До каси</a>
+            <span class="badge bg-primary">{{ today }}</span>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="text-uppercase small fw-bold opacity-75">Каса за сьогодні</div>
+                    <div class="stat-value">{{ cash_today|floatformat:2 }} ₴</div>
+                    <div class="opacity-75">Сума всіх чеків за сьогодні</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="text-uppercase small fw-bold opacity-75">Чистий прибуток</div>
+                    <div class="stat-value">{{ profit_today|floatformat:2 }} ₴</div>
+                    <div class="opacity-75">Прибуток за сьогодні</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>📉 Товари, що закінчуються</span>
+                    <span class="badge bg-warning text-dark">≤ 5 шт</span>
+                </div>
+                <div class="card-body p-0">
+                    {% if low_stock %}
+                    <table class="table mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th>Товар</th>
+                                <th>Категорія</th>
+                                <th class="text-end">Залишок</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for p in low_stock %}
+                            <tr>
+                                <td>{{ p.name }}</td>
+                                <td class="text-muted">{{ p.category.name }}</td>
+                                <td class="text-end"><span class="badge bg-danger">{{ p.quantity|floatformat:0 }} шт</span></td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                        <div class="p-3 text-center text-muted">Немає позицій з низьким залишком</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">🧾 Останні чеки</div>
+                <div class="card-body p-0">
+                    {% if latest_orders %}
+                    <table class="table mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Дата</th>
+                                <th class="text-end">Сума</th>
+                                <th class="text-end">Прибуток</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for o in latest_orders %}
+                            <tr>
+                                <td>{{ o.id }}</td>
+                                <td class="text-muted">{{ o.created_at|date:"Y-m-d H:i" }}</td>
+                                <td class="text-end fw-bold">{{ o.total_price|floatformat:2 }} ₴</td>
+                                <td class="text-end text-success">{{ o.total_profit|floatformat:2 }} ₴</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                        <div class="p-3 text-center text-muted">Чеків поки немає</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

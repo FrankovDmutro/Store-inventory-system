@@ -2,20 +2,24 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q, F
+from django.db.models import Q, F, Sum
 from django.db import transaction
+from django.utils import timezone
 from decimal import Decimal, InvalidOperation
 import logging
 from .models import Product, Category, Order, OrderItem
+from .utils import role_required, ROLE_CASHIER, ROLE_MANAGER
 
 logger = logging.getLogger(__name__)
 
 @login_required
+@role_required(ROLE_CASHIER)
 def category_list(request):
     categories = Category.objects.all()
     return render(request, 'store/category_list.html', {'categories': categories})
 
 @login_required
+@role_required(ROLE_CASHIER)
 def category_detail(request, category_id):
     category = get_object_or_404(Category, id=category_id)
     
@@ -53,6 +57,7 @@ def category_detail(request, category_id):
 
 # === ГІБРИДНА ФУНКЦІЯ ДОДАВАННЯ (AJAX + звичайна) ===
 @login_required
+@role_required(ROLE_CASHIER)
 def cart_add(request, product_id):
     try:
         cart = request.session.get('cart', {})
@@ -117,6 +122,7 @@ def cart_add(request, product_id):
 
 # === ПОШУК ===
 @login_required
+@role_required(ROLE_CASHIER)
 def search_products(request):
     query = request.GET.get('q', '').strip()
     cat_id = request.GET.get('category_id')
@@ -158,6 +164,7 @@ def search_products(request):
         return JsonResponse({'here': [], 'others': [], 'error': 'Помилка пошуку'})
 
 @login_required
+@role_required(ROLE_CASHIER)
 def cart_clear(request, category_id):
     if 'cart' in request.session:
         del request.session['cart']
@@ -166,6 +173,7 @@ def cart_clear(request, category_id):
     return redirect('category_detail', category_id=category_id)
 
 @login_required
+@role_required(ROLE_CASHIER)
 def cart_checkout(request, category_id):
     cart = request.session.get('cart', {})
     if not cart:
@@ -231,3 +239,30 @@ def cart_checkout(request, category_id):
         logger.error(f"Error in cart_checkout: {e}")
         messages.error(request, 'Виникла помилка при оформленні чеку. Спробуйте ще раз.')
         return redirect('category_detail', category_id=category_id)
+
+
+@login_required
+@role_required(ROLE_MANAGER)
+def manager_dashboard(request):
+
+    today = timezone.localdate()
+
+    orders_today = Order.objects.filter(created_at__date=today)
+    agg = orders_today.aggregate(
+        cash=Sum('total_price'),
+        profit=Sum('total_profit')
+    )
+
+    cash_today = agg['cash'] or Decimal('0')
+    profit_today = agg['profit'] or Decimal('0')
+
+    low_stock = Product.objects.filter(quantity__lte=5).select_related('category').order_by('quantity', 'name')[:20]
+    latest_orders = Order.objects.order_by('-created_at').prefetch_related('items__product')[:10]
+
+    return render(request, 'store/manager_dashboard.html', {
+        'cash_today': cash_today,
+        'profit_today': profit_today,
+        'low_stock': low_stock,
+        'latest_orders': latest_orders,
+        'today': today,
+    })

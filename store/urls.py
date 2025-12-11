@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path('', views.category_list, name='category_list'),
+    path('manager/', views.manager_dashboard, name='manager_dashboard'),
     path('category/<int:category_id>/', views.category_detail, name='category_detail'),
     
     # API для пошуку

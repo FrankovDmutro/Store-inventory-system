@@ -4,6 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.contrib.auth.views import LoginView
+from store.utils import get_role_level, role_home_url
 
 # === ФУНКЦІЯ-РЕГУЛЮВАЛЬНИК ===
 def root_redirect(request):
@@ -11,22 +12,13 @@ def root_redirect(request):
     if not request.user.is_authenticated:
         return redirect('login')
     
-    # 2. Якщо це Суперюзер (Власник) -> в Адмінку
-    if request.user.is_superuser:
-        return redirect('/admin/')
-    
-    # 3. Всі інші (Касири) -> на сторінку категорій
-    return redirect('category_list')
+    return redirect(role_home_url(get_role_level(request.user)))
 
 # Кастомний LoginView - редіректить авторизованих
 class CustomLoginView(LoginView):
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            # Якщо це суперюзер - на адмінку
-            if request.user.is_superuser:
-                return redirect('/admin/')
-            # Інакше на магазин
-            return redirect('category_list')
+            return redirect(role_home_url(get_role_level(request.user)))
         return super().dispatch(request, *args, **kwargs)
 
 urlpatterns = [
