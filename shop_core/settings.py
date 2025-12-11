@@ -56,6 +56,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'store.middleware.RoleBasedAccessMiddleware',  # Наша перевірка ролей
 ]
 
 ROOT_URLCONF = 'shop_core.urls'
@@ -149,9 +150,9 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # === НАЛАШТУВАННЯ ВХОДУ ===
-LOGIN_URL = '/accounts/login/'
+LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'  # Після входу кидаємо на головну (а там розберемося)
-LOGOUT_REDIRECT_URL = '/accounts/login/'  # Після виходу - на логін
+LOGOUT_REDIRECT_URL = '/login/'  # Після виходу - на логін
 LOGOUT_ALLOWED_METHODS = ['POST']  # Дозволити вихід тільки через POST
 
 # === НАЛАШТУВАННЯ СЕСІЇ ===

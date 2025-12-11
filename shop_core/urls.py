@@ -4,6 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.contrib.auth.views import LoginView
+from store import views as store_views
 from store.utils import get_role_level, role_home_url
 
 # === ФУНКЦІЯ-РЕГУЛЮВАЛЬНИК ===
@@ -26,9 +27,12 @@ urlpatterns = [
     path('', root_redirect, name='root'),
     
     path('admin/', admin.site.urls),
+
+    # Дашборд менеджера
+    path('manager/', store_views.manager_dashboard, name='manager_dashboard'),
     
     # Кастомний Login (перевіряє чи юзер вже залогінений)
-    path('accounts/login/', CustomLoginView.as_view(template_name='registration/login.html'), name='login'),
+    path('login/', CustomLoginView.as_view(template_name='registration/login.html'), name='login'),
     
     # Інші auth URLs (logout, etc.)
     path('accounts/', include('django.contrib.auth.urls')),

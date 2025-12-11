@@ -14,9 +14,13 @@
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3 class="mb-0">📊 Менеджерська панель</h3>
-        <div>
-            <a href="{% url 'category_list' %}" class="btn btn-outline-secondary btn-sm me-2">⬅ До каси</a>
+        <div class="d-flex align-items-center gap-2">
             <span class="badge bg-primary">{{ today }}</span>
+            <span class="text-muted">👤 {{ user.username }}</span>
+            <form method="post" action="{% url 'logout' %}" class="mb-0">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-danger">Вихід</button>
+            </form>
         </div>
     </div>
 

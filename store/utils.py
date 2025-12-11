@@ -1,6 +1,5 @@
 from functools import wraps
 from django.conf import settings
-from django.contrib import messages
 from django.shortcuts import redirect
 from django.urls import reverse
 
@@ -35,7 +34,7 @@ def role_home_url(role_level):
 
 
 def role_required(required_role_level):
-    """Декоратор: пускає тільки точну роль, інших переспрямовує додому."""
+    """Декоратор: пускає тільки точну роль, інших тихо переспрямовує додому."""
 
     def decorator(view_func):
         @wraps(view_func)
@@ -43,7 +42,6 @@ def role_required(required_role_level):
             user_level = get_role_level(request.user)
 
             if user_level != required_role_level:
-                messages.error(request, 'Доступ заборонено для вашої ролі.')
                 return redirect(role_home_url(user_level))
 
             return view_func(request, *args, **kwargs)
