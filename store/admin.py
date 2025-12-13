@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Category, Product, Order, OrderItem, Supplier, Purchase, PurchaseItem, WriteOff
+from .models import Category, Product, Order, OrderItem, Supplier, Purchase, PurchaseItem, WriteOff, Return, ReturnItem
 
 # === КАТЕГОРІЇ ===
 class CategoryAdmin(admin.ModelAdmin):
@@ -48,85 +48,61 @@ class OrderAdmin(admin.ModelAdmin):
     def items_count(self, obj):
         return obj.items.count()
     items_count.short_description = "К-сть товарів"
+    
+    def total_profit(self, obj):
+        return f"{obj.get_total_profit():.2f} ₴"
+    total_profit.short_description = "Прибуток"
 
-    # Забороняємо видаляти чеки (опціонально, можна залишити True, якщо адміну треба чистити помилки)
-    # def has_delete_permission(self, request, obj=None):
-    #     return False
 
-# Налаштування Товарів (залишаємо як було)
+# 3. ТОВАРИ (Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'sku', 'category', 'purchase_price', 'price', 'margin', 'quantity_display', 'image_preview')
-    search_fields = ('name', 'sku')
-    list_filter = ('category',)
-    # Дозволяємо редагувати ціну, але показуємо прибуток
-    readonly_fields = ('margin', 'created_at')
-    
-    def quantity_display(self, obj):
-        """Відображає кількість без зайвих нулів"""
-        if obj.quantity % 1 == 0:
-            return int(obj.quantity)
-        return f"{obj.quantity:g}"
-    quantity_display.short_description = 'Кількість на складі'
-    quantity_display.admin_order_field = 'quantity'
-    fieldsets = (
-        ('Основна інформація', {
-            'fields': ('category', 'sku', 'name', 'description', 'image')
-        }),
-        ('Вага/Об\'єм', {
-            'fields': ('weight_value', 'weight_unit')
-        }),
-        ('Ціноутворення', {
-            'fields': ('purchase_price', 'price', 'margin')
-        }),
-        ('Залишки', {
-            'fields': ('quantity',)
-        }),
-        ('Системна інформація', {
-            'fields': ('created_at',),
-            'classes': ('collapse',)
-        }),
-    )
-    
-    def image_preview(self, obj):
-        if obj.image:
-            return format_html('<img src="{}" style="width: 50px; height: 50px; object-fit: cover;" />', obj.image.url)
-        return '-'
-    image_preview.short_description = 'Фото'
-
-admin.site.register(Category, CategoryAdmin)
-admin.site.register(Product, ProductAdmin)
-admin.site.register(Order, OrderAdmin)
+    list_display = ['name', 'category', 'price', 'purchase_price', 'quantity', 'expiry_date']
+    list_filter = ['category']
+    search_fields = ['name', 'sku']
 
 
-# === ПОСТАЧАЛЬНИКИ ===
-class SupplierAdmin(admin.ModelAdmin):
-    list_display = ['name', 'phone', 'email', 'categories_list', 'created_at']
-    search_fields = ['name', 'phone', 'email']
-    list_filter = ['categories']
-
-    def categories_list(self, obj):
-        return ", ".join([c.name for c in obj.categories.all()]) or '-'
-    categories_list.short_description = 'Категорії'
-
-
-# === ПОЗИЦІЇ В ПОСТАВЦІ (inline) ===
+# === ПОСТАЧАЛЬНИКИ ТА ПОСТАВКИ ===
 class PurchaseItemInline(admin.TabularInline):
     model = PurchaseItem
     raw_id_fields = ['product']
-    extra = 0
+    extra = 1
+    
+    def get_readonly_fields(self, request, obj=None):
+        # Блокуємо редагування тільки після збереження
+        if obj and obj.received_applied:
+            return ['product', 'quantity', 'unit_cost']
+        return []
 
 
-# === ПОСТАВКИ ===
+class SupplierAdmin(admin.ModelAdmin):
+    list_display = ['name', 'phone', 'email']
+    search_fields = ['name', 'phone', 'email']
+
+
 class PurchaseAdmin(admin.ModelAdmin):
-    list_display = ['id', 'supplier', 'status', 'expected_date', 'total_cost', 'created_at']
-    list_filter = ['status', 'supplier']
+    list_display = ['id', 'supplier', 'status', 'total_cost', 'created_at']
+    list_filter = ['status', 'created_at']
     date_hierarchy = 'created_at'
-    readonly_fields = ['created_at', 'total_cost']
     inlines = [PurchaseItemInline]
+    readonly_fields = ['total_cost']
 
-    def save_related(self, request, form, formsets, change):
-        super().save_related(request, form, formsets, change)
-        # після збереження рядків перерахувати суму
+    def get_readonly_fields(self, request, obj=None):
+        # Блокуємо редагування supplier після збереження
+        base_readonly = ['total_cost']
+        if obj and obj.id:
+            base_readonly.append('supplier')
+        return base_readonly
+
+    def save_model(self, request, obj, form, change):
+        # При зміні статусу на "received" — зараховуємо товар у базу
+        super().save_model(request, obj, form, change)
+        purchase = obj
+        if purchase.status == 'received' and not purchase.received_applied:
+            purchase.apply_to_stock_once()
+
+    def save_formset(self, request, form, formset, change):
+        formset.save()
+        # Після збереження позицій — перераховуємо total_cost
         purchase = form.instance
         purchase.recalc_total()
         purchase.save(update_fields=['total_cost'])
@@ -158,3 +134,61 @@ class WriteOffAdmin(admin.ModelAdmin):
         return request.user.is_superuser
 
 admin.site.register(WriteOff, WriteOffAdmin)
+
+
+# === ПОВЕРНЕННЯ ===
+class ReturnItemInline(admin.TabularInline):
+    model = ReturnItem
+    readonly_fields = ['product', 'quantity', 'unit_price', 'purchase_price', 'line_total_display', 'line_loss_display']
+    can_delete = False
+    max_num = 0
+    extra = 0
+    
+    def line_total_display(self, obj):
+        if obj.id:
+            return f"{obj.get_line_total():.2f} грн"
+        return "-"
+    line_total_display.short_description = "Сума повернення"
+    
+    def line_loss_display(self, obj):
+        if obj.id:
+            return f"{obj.get_line_loss():.2f} грн"
+        return "-"
+    line_loss_display.short_description = "Збиток"
+
+
+class ReturnAdmin(admin.ModelAdmin):
+    list_display = ['id', 'order', 'reason', 'processed_by', 'created_at', 'refund_display', 'loss_display']
+    list_filter = ['reason', 'created_at', 'processed_by']
+    date_hierarchy = 'created_at'
+    search_fields = ['order__id', 'comment']
+    readonly_fields = ['order', 'created_at', 'processed_by', 'refund_display', 'loss_display']
+    inlines = [ReturnItemInline]
+    
+    def has_add_permission(self, request):
+        # Повернення створюються тільки через інтерфейс касира
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        # Тільки суперюзер може видаляти повернення
+        return request.user.is_superuser
+    
+    def refund_display(self, obj):
+        if obj.pk is None:
+            return "-"
+        return f"{obj.get_total_refund():.2f} грн"
+    refund_display.short_description = 'Повернено клієнту'
+    
+    def loss_display(self, obj):
+        if obj.pk is None:
+            return "-"
+        return f"{obj.get_total_loss():.2f} грн"
+    loss_display.short_description = 'Втрачений прибуток'
+
+admin.site.register(Return, ReturnAdmin)
+
+
+# Реєстрація базових моделей
+admin.site.register(Category, CategoryAdmin)
+admin.site.register(Product, ProductAdmin)
+admin.site.register(Order, OrderAdmin)

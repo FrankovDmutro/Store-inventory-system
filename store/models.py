@@ -287,4 +287,110 @@ class WriteOff(models.Model):
     class Meta:
         verbose_name = "Списання"
         verbose_name_plural = "Списання"
+
+
+class Return(models.Model):
+    """Модель для повернень товарів від клієнтів"""
+    class ReturnReason(models.TextChoices):
+        DEFECTIVE = 'defective', 'Бракований товар'
+        WRONG_PRODUCT = 'wrong_product', 'Не той товар'
+        CHANGED_MIND = 'changed_mind', 'Передумав покупець'
+        EXPIRED = 'expired', 'Прострочений товар'
+        OTHER = 'other', 'Інше'
+    
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name='returns',
+        verbose_name="Чек"
+    )
+    reason = models.CharField(
+        max_length=20,
+        choices=ReturnReason.choices,
+        default=ReturnReason.OTHER,
+        verbose_name="Причина повернення"
+    )
+    comment = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Коментар"
+    )
+    processed_by = models.ForeignKey(
+        'auth.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name="Касир"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Дата повернення"
+    )
+    
+    def get_total_refund(self):
+        """Загальна сума повернення"""
+        total = Decimal('0')
+        for item in self.items.all():
+            total += item.quantity * item.unit_price
+        return total
+    
+    def get_total_loss(self):
+        """Загальний збиток (прибуток, який втрачаємо)"""
+        total = Decimal('0')
+        for item in self.items.all():
+            # Втрачаємо прибуток: (ціна продажу - собівартість) * кількість
+            profit_per_item = item.unit_price - item.purchase_price
+            total += profit_per_item * item.quantity
+        return total
+    
+    def __str__(self):
+        return f"Повернення #{self.id} до чеку #{self.order.id}"
+    
+    class Meta:
+        verbose_name = "Повернення"
+        verbose_name_plural = "Повернення"
         ordering = ['-created_at']
+
+
+class ReturnItem(models.Model):
+    """Позиція повернення (яку кількість якого товару повертають)"""
+    return_instance = models.ForeignKey(
+        Return,
+        on_delete=models.CASCADE,
+        related_name='items',
+        verbose_name="Повернення"
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        verbose_name="Товар"
+    )
+    quantity = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
+        verbose_name="Кількість"
+    )
+    unit_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name="Ціна продажу за од."
+    )
+    purchase_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name="Собівартість за од."
+    )
+    
+    def get_line_total(self):
+        """Сума повернення за цю позицію"""
+        return self.quantity * self.unit_price
+    
+    def get_line_loss(self):
+        """Збиток за цю позицію"""
+        profit_per_item = self.unit_price - self.purchase_price
+        return profit_per_item * self.quantity
+    
+    def __str__(self):
+        return f"{self.product.name} x {self.quantity}"
+    
+    class Meta:
+        verbose_name = "Позиція повернення"
+        verbose_name_plural = "Позиції повернення"

@@ -40,4 +40,10 @@ urlpatterns = [
     # Чеки (Receipts)
     path('receipt/<int:order_id>/details/', views.receipt_details, name='receipt_details'),
     path('receipt/<int:order_id>/download-pdf/', views.receipt_download_pdf, name='receipt_download_pdf'),
+    
+    # Чеки для касира (перегляд та повернення)
+    path('receipts/', views.receipts_list_cashier, name='receipts_list_cashier'),
+    path('receipts', RedirectView.as_view(pattern_name='receipts_list_cashier', permanent=False)),
+    path('receipts/<int:order_id>/', views.receipt_detail_cashier, name='receipt_detail_cashier'),
+    path('receipts/<int:order_id>/return/', views.process_return, name='process_return'),
 ]

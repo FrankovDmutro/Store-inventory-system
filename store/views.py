@@ -10,7 +10,7 @@ from decimal import Decimal, InvalidOperation
 from datetime import timedelta
 import json
 import logging
-from .models import Product, Category, Order, OrderItem, Supplier, Purchase, PurchaseItem, WriteOff
+from .models import Product, Category, Order, OrderItem, Supplier, Purchase, PurchaseItem, WriteOff, Return, ReturnItem
 from .forms import SupplierForm, PurchaseItemForm, CartItemForm, WriteOffForm
 from .services import PurchaseService, OrderService, SupplierService, ReceiptService
 from .utils import role_required, ROLE_CASHIER, ROLE_MANAGER
@@ -808,3 +808,179 @@ def receipt_download_pdf(request, order_id):
     except Exception as e:
         logger.error(f"Error in receipt_download_pdf: {e}")
         return HttpResponse('Помилка при генеруванні PDF', status=400)
+
+
+@login_required
+@role_required(ROLE_CASHIER)
+def receipts_list_cashier(request):
+    """
+    Список всіх чеків для касира з можливістю фільтрації.
+    """
+    # Фільтри
+    search_query = request.GET.get('search', '').strip()
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    
+    orders = Order.objects.all().prefetch_related('items__product')
+    
+    # Пошук за номером чека
+    if search_query:
+        try:
+            order_id = int(search_query)
+            orders = orders.filter(id=order_id)
+        except ValueError:
+            orders = orders.none()
+    
+    # Фільтр за датою
+    if date_from:
+        orders = orders.filter(created_at__date__gte=date_from)
+    if date_to:
+        orders = orders.filter(created_at__date__lte=date_to)
+    
+    orders = orders.order_by('-created_at')
+    
+    # Додаємо інформацію про повернення
+    for order in orders:
+        order.has_returns = order.returns.exists()
+        order.total_returned = order.returns.aggregate(
+            total=Sum('items__quantity')
+        )['total'] or 0
+    
+    return render(request, 'store/receipts_list_cashier.html', {
+        'orders': orders,
+        'search_query': search_query,
+        'date_from': date_from,
+        'date_to': date_to,
+    })
+
+
+@login_required
+@role_required(ROLE_CASHIER)
+def receipt_detail_cashier(request, order_id):
+    """
+    Детальний перегляд чека з можливістю повернення товарів.
+    """
+    order = get_object_or_404(Order.objects.prefetch_related('items__product', 'returns__items'), id=order_id)
+    
+    # Отримуємо всі повернення для цього чека
+    returns = order.returns.all().prefetch_related('items__product')
+    
+    # Рахуємо, скільки товарів вже повернено
+    returned_quantities = {}
+    for return_obj in returns:
+        for item in return_obj.items.all():
+            product_id = item.product.id
+            returned_quantities[product_id] = returned_quantities.get(product_id, 0) + item.quantity
+    
+    # Додаємо інформацію про доступну кількість для повернення
+    order_items_with_return_info = []
+    for item in order.items.all():
+        already_returned = returned_quantities.get(item.product.id, 0)
+        available_to_return = item.quantity - already_returned
+        order_items_with_return_info.append({
+            'item': item,
+            'already_returned': already_returned,
+            'available_to_return': available_to_return,
+        })
+    
+    return render(request, 'store/receipt_detail_cashier.html', {
+        'order': order,
+        'order_items_with_return_info': order_items_with_return_info,
+        'returns': returns,
+        'return_reasons': Return.ReturnReason.choices,
+    })
+
+
+@login_required
+@role_required(ROLE_CASHIER)
+def process_return(request, order_id):
+    """
+    Обробка повернення товарів. Створює запис Return, повертає товар на склад.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Тільки POST запити'}, status=400)
+    
+    order = get_object_or_404(Order, id=order_id)
+    
+    try:
+        data = json.loads(request.body)
+        reason = data.get('reason', 'other')
+        comment = data.get('comment', '')
+        items_to_return = data.get('items', [])  # [{'product_id': 1, 'quantity': 2}, ...]
+        
+        if not items_to_return:
+            return JsonResponse({'status': 'error', 'message': 'Не вказано товари для повернення'}, status=400)
+        
+        # Валідація: перевіряємо, чи всі товари є в чеку
+        order_items_map = {item.product.id: item for item in order.items.all()}
+        
+        # Рахуємо вже повернені кількості
+        returned_quantities = {}
+        for return_obj in order.returns.all():
+            for item in return_obj.items.all():
+                product_id = item.product.id
+                returned_quantities[product_id] = returned_quantities.get(product_id, 0) + item.quantity
+        
+        # Перевірка коректності даних
+        for return_item_data in items_to_return:
+            product_id = return_item_data.get('product_id')
+            quantity = return_item_data.get('quantity', 0)
+            
+            if product_id not in order_items_map:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Товар з ID {product_id} не знайдено в чеку'
+                }, status=400)
+            
+            order_item = order_items_map[product_id]
+            already_returned = returned_quantities.get(product_id, 0)
+            available = order_item.quantity - already_returned
+            
+            if quantity <= 0 or quantity > available:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Некоректна кількість для {order_item.product.name}. Доступно: {available}'
+                }, status=400)
+        
+        # Створюємо повернення
+        with transaction.atomic():
+            return_obj = Return.objects.create(
+                order=order,
+                reason=reason,
+                comment=comment,
+                processed_by=request.user
+            )
+            
+            for return_item_data in items_to_return:
+                product_id = return_item_data['product_id']
+                quantity = return_item_data['quantity']
+                order_item = order_items_map[product_id]
+                
+                # Створюємо позицію повернення
+                ReturnItem.objects.create(
+                    return_instance=return_obj,
+                    product=order_item.product,
+                    quantity=quantity,
+                    unit_price=order_item.price,
+                    purchase_price=order_item.product.purchase_price
+                )
+                
+                # Повертаємо товар на склад
+                Product.objects.filter(id=product_id).update(quantity=F('quantity') + quantity)
+            
+            logger.info(f"Return #{return_obj.id} created for order #{order.id} by user {request.user.username}")
+            
+            return JsonResponse({
+                'status': 'success',
+                'message': f'Повернення успішно оформлене',
+                'return_id': return_obj.id,
+                'total_refund': float(return_obj.get_total_refund()),
+                'total_loss': float(return_obj.get_total_loss())
+            })
+    
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Невірний формат даних'}, status=400)
+    except Exception as e:
+        logger.error(f"Error in process_return: {e}")
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+

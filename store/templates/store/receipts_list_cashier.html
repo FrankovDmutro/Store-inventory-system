@@ -1,0 +1,100 @@
+{% extends 'store/base.html' %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="fas fa-receipt me-2"></i>Чеки
+        </h2>
+        <a href="{% url 'category_list' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Повернутися до каси
+        </a>
+    </div>
+
+    <!-- Фільтри -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label for="search" class="form-label">Пошук за номером чека</label>
+                    <input type="text" class="form-control" id="search" name="search" 
+                           value="{{ search_query }}" placeholder="Введіть номер чека">
+                </div>
+                <div class="col-md-3">
+                    <label for="date_from" class="form-label">Дата від</label>
+                    <input type="date" class="form-control" id="date_from" name="date_from" 
+                           value="{{ date_from }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="date_to" class="form-label">Дата до</label>
+                    <input type="date" class="form-control" id="date_to" name="date_to" 
+                           value="{{ date_to }}">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-2"></i>Знайти
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Список чеків -->
+    <div class="card">
+        <div class="card-body">
+            {% if orders %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>№ Чека</th>
+                                <th>Дата і час</th>
+                                <th>Кількість товарів</th>
+                                <th>Сума</th>
+                                <th>Статус</th>
+                                <th>Дії</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in orders %}
+                            <tr>
+                                <td><strong>#{{ order.id }}</strong></td>
+                                <td>{{ order.created_at|date:"d.m.Y H:i" }}</td>
+                                <td>{{ order.items.count }} шт.</td>
+                                <td><strong>{{ order.total_price }} грн</strong></td>
+                                <td>
+                                    {% if order.has_returns %}
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="fas fa-undo me-1"></i>Є повернення ({{ order.total_returned }})
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>Активний
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'receipt_detail_cashier' order.id %}" 
+                                       class="btn btn-sm btn-primary">
+                                        <i class="fas fa-eye me-1"></i>Переглянути
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info text-center">
+                    <i class="fas fa-info-circle me-2"></i>
+                    {% if search_query or date_from or date_to %}
+                        За вказаними критеріями чеки не знайдено
+                    {% else %}
+                        Чеків поки що немає
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
