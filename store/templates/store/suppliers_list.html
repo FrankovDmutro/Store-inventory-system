@@ -9,7 +9,9 @@
         .card { border: none; box-shadow: 0 6px 20px rgba(0,0,0,0.05); }
         .supplier-item { cursor: pointer; transition: all 0.2s ease; }
         .supplier-item:hover { transform: translateX(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .supplier-item.active { background: #e7f1ff; border-left: 4px solid #0d6efd; }
+        .supplier-item.active { background: #0d6efd !important; border-left: 4px solid #0d6efd; color: white !important; }
+        .supplier-item.active h6, .supplier-item.active small { color: white !important; }
+        .supplier-item.active .badge { background-color: rgba(255,255,255,0.3) !important; color: white !important; }
         .product-checkbox { width: 18px; height: 18px; margin-right: 10px; }
         .badge-supplier { font-size: 0.85rem; padding: 0.4rem 0.6rem; }
         input[type="number"] { width: 80px; }
@@ -136,10 +138,8 @@
                     <div class="card h-100">
                         <div class="card-header">
                             <h5 class="mb-1">📦 Доступні товари</h5>
-                            <small class="text-muted">Виберіть постачальника зліва</small>
                         </div>
                         <div class="card-body">
-                            <input type="text" id="searchProducts" class="form-control mb-3" placeholder="Пошук товару...">
                             <div id="productsList">
                                 <p class="text-muted text-center">Виберіть постачальника зліва</p>
                             </div>
@@ -552,19 +552,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (modal) modal.hide();
         document.getElementById('purchaseForm').submit();
     });
-    
-    // Пошук товарів
-    document.getElementById('searchProducts').addEventListener('input', function(e) {
-        const query = e.target.value.toLowerCase();
-        const productsList = document.getElementById('productsList');
-        const items = productsList.querySelectorAll('.list-group-item');
-        
-        items.forEach(item => {
-            const text = item.textContent.toLowerCase();
-            item.style.display = text.includes(query) ? '' : 'none';
-        });
-    });
 });
+</script>
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
