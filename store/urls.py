@@ -6,6 +6,9 @@ urlpatterns = [
     path('', views.category_list, name='category_list'),
     # Тримай сумісність: старий шлях редіректить на новий /manager
     path('manager/', lambda request: redirect('manager_dashboard')),
+    path('manager/dashboard/', views.manager_dashboard, name='manager_dashboard'),
+    path('manager/receipts/', views.manager_receipts_list, name='manager_receipts_list'),
+    path('manager/products/', views.manager_products_list, name='manager_products_list'),
     path('category/<int:category_id>/', views.category_detail, name='category_detail'),
     
     # API для пошуку

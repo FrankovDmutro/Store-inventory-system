@@ -266,3 +266,100 @@ def manager_dashboard(request):
         'latest_orders': latest_orders,
         'today': today,
     })
+
+
+@login_required
+@role_required(ROLE_MANAGER)
+def manager_receipts_list(request):
+    """Сторінка списку всіх чеків з фільтром за датою та сортуванням."""
+    from .models import Order
+    qs = Order.objects.all()
+
+    # Фільтр за датою: ?date=YYYY-MM-DD
+    date_str = request.GET.get('date')
+    if date_str:
+        try:
+            target = timezone.datetime.fromisoformat(date_str)
+            qs = qs.filter(created_at__date=target.date())
+        except Exception:
+            pass
+
+    # Сортування: ?sort=id|date|total|profit
+    sort = request.GET.get('sort', 'date')
+    order = request.GET.get('order', 'desc')
+
+    if sort == 'id':
+        qs = qs.order_by('id' if order == 'asc' else '-id')
+    elif sort == 'total':
+        qs = qs.order_by('total_price' if order == 'asc' else '-total_price')
+    elif sort == 'profit':
+        qs = qs.order_by('total_profit' if order == 'asc' else '-total_profit')
+    else:  # date
+        qs = qs.order_by('created_at' if order == 'asc' else '-created_at')
+
+    # Пагінація проста: ?page=1
+    page = request.GET.get('page')
+    try:
+        page = int(page) if page else 1
+    except ValueError:
+        page = 1
+    page_size = 50
+    start = (page - 1) * page_size
+    end = start + page_size
+
+    orders = qs[start:end]
+
+    return render(request, 'store/manager_receipts_list.html', {
+        'orders': orders,
+        'page': page,
+        'date': date_str or '',
+        'current_sort': sort,
+        'current_order': order,
+    })
+
+
+@login_required
+@role_required(ROLE_MANAGER)
+def manager_products_list(request):
+    """Сторінка списку товарів з сортуванням та фільтром по категорії."""
+    from .models import Product, Category
+
+    qs = Product.objects.select_related('category').all()
+
+    # Фільтр за категорією: ?category=<id>
+    category_id = request.GET.get('category')
+    if category_id:
+        try:
+            qs = qs.filter(category_id=int(category_id))
+        except ValueError:
+            pass
+
+    # Сортування: ?sort=quantity|name|price|profit
+    sort = request.GET.get('sort', 'name')
+    order = request.GET.get('order', 'asc')
+
+    if sort == 'quantity':
+        qs = qs.order_by('quantity' if order == 'asc' else '-quantity')
+    elif sort == 'price':
+        qs = qs.order_by('price' if order == 'asc' else '-price')
+    elif sort == 'profit':
+        # маржа = price - purchase_price (сортуємо за нею)
+        from django.db.models import F, ExpressionWrapper, DecimalField
+        margin = ExpressionWrapper(F('price') - F('purchase_price'), output_field=DecimalField(max_digits=10, decimal_places=2))
+        qs = qs.annotate(margin=margin).order_by('margin' if order == 'asc' else '-margin')
+    elif sort == 'category':
+        qs = qs.order_by('category__name' if order == 'asc' else '-category__name')
+    elif sort == 'sku':
+        qs = qs.order_by('sku' if order == 'asc' else '-sku')
+    else:
+        qs = qs.order_by('name' if order == 'asc' else '-name')
+
+    categories = Category.objects.all().order_by('name')
+
+    return render(request, 'store/manager_products_list.html', {
+        'products': qs[:500],
+        'categories': categories,
+        'current_category': category_id,
+        'current_sort': sort,
+        'current_order': order,
+    })

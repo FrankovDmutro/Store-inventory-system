@@ -1,0 +1,66 @@
+{% extends 'store/base.html' %}
+{% load static %}
+{% block title %}Всі чеки{% endblock %}
+{% block content %}
+<div class="container mt-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Список чеків</h3>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{% url 'manager_dashboard' %}">⬅ Повернутися до панелі</a>
+      <form class="d-flex" method="get">
+        <input type="date" name="date" class="form-control form-control-sm" value="{{ date }}">
+        <button class="btn btn-sm btn-primary ms-2" type="submit">Фільтрувати</button>
+        <a class="btn btn-sm btn-secondary ms-1" href="?">Скинути</a>
+      </form>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>
+            <a href="?{% if date %}date={{ date }}&{% endif %}sort=id&order={% if current_sort == 'id' and current_order == 'asc' %}desc{% else %}asc{% endif %}">#
+              {% if current_sort == 'id' %}{% if current_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+            </a>
+          </th>
+          <th>
+            <a href="?{% if date %}date={{ date }}&{% endif %}sort=date&order={% if current_sort == 'date' and current_order == 'asc' %}desc{% else %}asc{% endif %}">Дата
+              {% if current_sort == 'date' %}{% if current_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+            </a>
+          </th>
+          <th>
+            <a href="?{% if date %}date={{ date }}&{% endif %}sort=total&order={% if current_sort == 'total' and current_order == 'asc' %}desc{% else %}asc{% endif %}">Сума
+              {% if current_sort == 'total' %}{% if current_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+            </a>
+          </th>
+          <th>
+            <a href="?{% if date %}date={{ date }}&{% endif %}sort=profit&order={% if current_sort == 'profit' and current_order == 'asc' %}desc{% else %}asc{% endif %}">Прибуток
+              {% if current_sort == 'profit' %}{% if current_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+            </a>
+          </th>
+          <th>Позиції</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in orders %}
+        <tr>
+          <td>{{ o.id }}</td>
+          <td>{{ o.created_at|date:'Y-m-d H:i' }}</td>
+          <td>{{ o.total_price }} ₴</td>
+          <td>{{ o.total_profit }} ₴</td>
+          <td>
+            {% for it in o.items.all %}
+              <span class="badge text-bg-light">{{ it.product.name }} × {{ it.quantity }}</span>
+            {% empty %}
+              —
+            {% endfor %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center">Немає чеків</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

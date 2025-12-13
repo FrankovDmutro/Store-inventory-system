@@ -1,0 +1,74 @@
+{% extends 'store/base.html' %}
+{% load static %}
+{% block title %}Товари{% endblock %}
+{% block content %}
+<div class="container mt-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Список товарів</h3>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{% url 'manager_dashboard' %}">⬅ Повернутися до панелі</a>
+      <form method="get" class="d-flex gap-2">
+        <select name="category" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Усі категорії</option>
+          {% for c in categories %}
+            <option value="{{ c.id }}" {% if c.id|stringformat:'s' == current_category %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>
+            <a href="?{% if current_category %}category={{ current_category }}&{% endif %}sort=name&order={% if current_sort == 'name' and current_order == 'asc' %}desc{% else %}asc{% endif %}">Назва
+              {% if current_sort == 'name' %}{% if current_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+            </a>
+          </th>
+          <th>
+            <a href="?{% if current_category %}category={{ current_category }}&{% endif %}sort=category&order={% if current_sort == 'category' and current_order == 'asc' %}desc{% else %}asc{% endif %}">Категорія
+              {% if current_sort == 'category' %}{% if current_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+            </a>
+          </th>
+          <th>
+            <a href="?{% if current_category %}category={{ current_category }}&{% endif %}sort=sku&order={% if current_sort == 'sku' and current_order == 'asc' %}desc{% else %}asc{% endif %}">Артикул
+              {% if current_sort == 'sku' %}{% if current_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+            </a>
+          </th>
+          <th>
+            <a href="?{% if current_category %}category={{ current_category }}&{% endif %}sort=quantity&order={% if current_sort == 'quantity' and current_order == 'asc' %}desc{% else %}asc{% endif %}">Залишок
+              {% if current_sort == 'quantity' %}{% if current_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+            </a>
+          </th>
+          <th>
+            <a href="?{% if current_category %}category={{ current_category }}&{% endif %}sort=price&order={% if current_sort == 'price' and current_order == 'asc' %}desc{% else %}asc{% endif %}">Ціна
+              {% if current_sort == 'price' %}{% if current_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+            </a>
+          </th>
+          <th>
+            <a href="?{% if current_category %}category={{ current_category }}&{% endif %}sort=profit&order={% if current_sort == 'profit' and current_order == 'asc' %}desc{% else %}asc{% endif %}">Маржа
+              {% if current_sort == 'profit' %}{% if current_order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+            </a>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in products %}
+        <tr>
+          <td>{{ p.name }}</td>
+          <td>{{ p.category.name }}</td>
+          <td>{{ p.sku|default:'—' }}</td>
+          <td>{{ p.quantity }} {{ p.get_weight_unit_display }}</td>
+          <td>{{ p.price }} ₴</td>
+          <td>{% if p.margin %}{{ p.margin }} ₴{% else %}—{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center">Нічого не знайдено</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

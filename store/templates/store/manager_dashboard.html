@@ -12,7 +12,7 @@
 </head>
 <body>
 <div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
         <h3 class="mb-0">📊 Менеджерська панель</h3>
         <div class="d-flex align-items-center gap-2">
             <span class="badge bg-primary">{{ today }}</span>
@@ -21,6 +21,13 @@
                 {% csrf_token %}
                 <button type="submit" class="btn btn-sm btn-danger">Вихід</button>
             </form>
+        </div>
+    </div>
+    <div class="mb-4">
+        <div class="btn-group" role="group">
+            <a href="{% url 'manager_dashboard' %}" class="btn btn-outline-secondary active">Панель</a>
+            <a href="{% url 'manager_receipts_list' %}" class="btn btn-outline-secondary">Всі чеки</a>
+            <a href="{% url 'manager_products_list' %}" class="btn btn-outline-secondary">Всі товари</a>
         </div>
     </div>
 
