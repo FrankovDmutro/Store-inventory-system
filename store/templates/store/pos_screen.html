@@ -165,6 +165,24 @@
     </div>
 </div>
 
+<!-- МОДАЛЬ ЧЕКА -->
+<div class="modal fade" id="receiptModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">🧾 Чек</h5>
+            </div>
+            <div class="modal-body" id="receiptContent" style="max-height: 60vh; overflow-y: auto;">
+                <!-- Сюди загружуватиметься HTML чека -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="downloadReceiptBtn">📥 Зберегти PDF</button>
+                <button type="button" class="btn btn-success" id="closeReceiptBtn" data-bs-dismiss="modal">✅ Готово</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     const catId = document.body.dataset.catId;
     const grid = document.getElementById('productsGrid');
@@ -312,35 +330,74 @@
             return;
         }
         
-        // Закриваємо модаль
-        const modal = bootstrap.Modal.getInstance(paymentModal);
-        modal.hide();
+        // Закриваємо модаль оплати
+        const paymentModal = bootstrap.Modal.getInstance(document.getElementById('paymentModal'));
+        paymentModal.hide();
         
-        // Виконуємо checkout в фоні
+        // Показуємо лоадер
+        const receiptContent = document.getElementById('receiptContent');
+        receiptContent.innerHTML = '<div class="text-center py-5"><div class="spinner-border" role="status"><span class="visually-hidden">Завантаження...</span></div></div>';
+        
+        // Виконуємо checkout та отримуємо чек
         fetch(`/store/cart/checkout/${catId}/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
                 'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
             },
             credentials: 'same-origin'
         })
         .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const orderId = data.order_id;
+                
+                // Отримуємо дані чека
+                return fetch(`/store/receipt/${orderId}/details/`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                }).then(res => res.json()).then(receiptData => {
+                    if (receiptData.status === 'success') {
+                        // Показуємо чек у модалі
+                        receiptContent.innerHTML = receiptData.receipt_html;
+                        
+                        // Встановлюємо ID замовлення для завантаження PDF
+                        document.getElementById('downloadReceiptBtn').dataset.orderId = orderId;
+                        
+                        // Показуємо модаль чека
+                        const receiptModal = new bootstrap.Modal(document.getElementById('receiptModal'));
+                        receiptModal.show();
+                        
+                        // Обробляємо закриття чека
+                        document.getElementById('closeReceiptBtn').onclick = function() {
+                            receiptModal.hide();
+                            // Редіректимо на категорії з повідомленням
+                            setTimeout(() => {
+                                window.location.href = `{% url "category_list" %}?success=1`;
+                            }, 300);
+                        };
+                    } else {
+                        throw new Error('Помилка при отриманні чека');
+                    }
+                });
+            } else {
+                throw new Error(data.message || 'Помилка при оформленні чеку');
+            }
+        })
         .catch(error => {
             console.error('Error:', error);
-        })
-        .finally(() => {
-            // Зберігаємо дані про успішний платіж в localStorage
-            localStorage.setItem('paymentSuccess', JSON.stringify({
-                total: total.toFixed(2),
-                cash: cash.toFixed(2),
-                change: change.toFixed(2),
-                timestamp: new Date().toLocaleTimeString('uk-UA')
-            }));
-            
-            // Редіректимо на категорії
-            window.location.href = `{% url "category_list" %}`;
+            alert('Помилка: ' + error.message);
+            // Повертаємо користувача до поточної сторінки
+            location.reload();
         });
+    });
+    
+    // Завантаження PDF чека
+    document.getElementById('downloadReceiptBtn').addEventListener('click', function() {
+        const orderId = this.dataset.orderId;
+        window.location.href = `/store/receipt/${orderId}/download-pdf/`;
     });
 
     // 4. ПОШУК ТОВАРІВ

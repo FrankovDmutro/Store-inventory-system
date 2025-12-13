@@ -5,6 +5,14 @@ Thin Views, Fat Services - складна логіка виноситься сю
 from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
+from django.template.loader import render_to_string
+from io import BytesIO
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import cm, mm
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from .models import Product, Supplier, Purchase, PurchaseItem, Order, OrderItem
 
 
@@ -191,3 +199,165 @@ class SupplierService:
             })
         
         return result
+
+
+class ReceiptService:
+    """Сервіс для генерування чеків у HTML та PDF форматі."""
+    
+    @staticmethod
+    def generate_receipt_html(order):
+        """
+        Генерує HTML чека для відображення у модальному вікні.
+        
+        Args:
+            order: Order - об'єкт замовлення
+            
+        Returns:
+            str - HTML розмітка чека
+        """
+        from django.utils.html import escape
+        
+        items = order.items.select_related('product')
+        
+        html_content = f"""
+        <div class="receipt-container" style="font-family: monospace; line-height: 1.4; max-width: 400px;">
+            <div style="text-align: center; border-bottom: 1px dashed #333; padding-bottom: 10px;">
+                <h3 style="margin: 5px 0; font-size: 1.2em;">🏪 КАССА</h3>
+                <p style="margin: 2px 0; font-size: 0.9em;">Чек №{order.id}</p>
+                <p style="margin: 2px 0; font-size: 0.85em;">{order.created_at.strftime('%d.%m.%Y %H:%M:%S')}</p>
+            </div>
+            
+            <table style="width: 100%; margin-top: 10px; font-size: 0.95em;">
+                <thead>
+                    <tr style="border-bottom: 1px dashed #333;">
+                        <th style="text-align: left; padding: 5px 0;">Товар</th>
+                        <th style="text-align: center; padding: 5px 0;">К-во</th>
+                        <th style="text-align: right; padding: 5px 0;">Сума</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        
+        for item in items:
+            product_name = escape(item.product.name)
+            item_total = item.quantity * item.price
+            html_content += f"""
+                    <tr>
+                        <td style="text-align: left; padding: 5px 0;">{product_name}</td>
+                        <td style="text-align: center; padding: 5px 0;">{item.quantity}</td>
+                        <td style="text-align: right; padding: 5px 0;">{item.price * item.quantity:.2f} ₴</td>
+                    </tr>
+            """
+        
+        html_content += """
+                </tbody>
+            </table>
+            
+            <div style="border-top: 1px dashed #333; border-bottom: 1px dashed #333; margin-top: 10px; padding: 10px 0; text-align: right;">
+                <strong>РАЗОМ: """ + f"{order.total_price:.2f} ₴" + """</strong>
+            </div>
+            
+            <div style="text-align: center; margin-top: 10px; font-size: 0.9em; color: #666;">
+                <p>Дякуємо за покупку! 😊</p>
+            </div>
+        </div>
+        """
+        
+        return html_content
+    
+    @staticmethod
+    def generate_receipt_pdf(order):
+        """
+        Генерує PDF чека.
+        
+        Args:
+            order: Order - об'єкт замовлення
+            
+        Returns:
+            BytesIO - PDF файл у вигляді байтів
+        """
+        # Визначаємо розміри для чека (як для теплового принтера)
+        width = 80 * mm
+        height = 200 * mm
+        
+        # Створюємо PDF
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=(width, height),
+            rightMargin=5*mm,
+            leftMargin=5*mm,
+            topMargin=5*mm,
+            bottomMargin=5*mm
+        )
+        
+        # Стилі
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=12,
+            textColor=colors.black,
+            alignment=1,  # центрування
+            spaceAfter=5
+        )
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=8,
+            leading=10,
+            alignment=1
+        )
+        
+        # Елементи для PDF
+        elements = []
+        
+        # Заголовок
+        elements.append(Paragraph("🏪 КАССА", title_style))
+        elements.append(Paragraph(f"Чек №{order.id}", normal_style))
+        elements.append(Paragraph(
+            order.created_at.strftime('%d.%m.%Y %H:%M:%S'),
+            normal_style
+        ))
+        elements.append(Spacer(1, 0.3*cm))
+        
+        # Таблиця товарів
+        items = order.items.select_related('product')
+        table_data = [['Товар', 'К-во', 'Ціна', 'Сума']]
+        
+        for item in items:
+            item_total = item.quantity * item.price
+            table_data.append([
+                item.product.name[:15],  # Скорочуємо довгі назви
+                str(item.quantity),
+                f"{item.price:.2f}",
+                f"{item_total:.2f}"
+            ])
+        
+        # Додаємо рядок з総сумою
+        table_data.append(['', '', 'РАЗОМ:', f"{order.total_price:.2f} ₴"])
+        
+        # Стиль таблиці
+        table = Table(table_data, colWidths=[2.5*cm, 1*cm, 1.2*cm, 1.2*cm])
+        table.setStyle(TableStyle([
+            ('FONTSIZE', (0, 0), (-1, -1), 7),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('LINEBELOW', (0, 0), (-1, 0), 0.5, colors.black),
+            ('LINEBELOW', (0, -1), (-1, -1), 0.5, colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ]))
+        
+        elements.append(table)
+        elements.append(Spacer(1, 0.3*cm))
+        
+        # Нижній текст
+        elements.append(Paragraph("Дякуємо за покупку! 😊", normal_style))
+        
+        # Будуємо PDF
+        doc.build(elements)
+        
+        # Повертаємо буфер на початок
+        buffer.seek(0)
+        return buffer
+

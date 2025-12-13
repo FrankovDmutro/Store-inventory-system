@@ -29,4 +29,8 @@ urlpatterns = [
     path('cart/add/<int:product_id>/', views.cart_add, name='cart_add'),
     path('cart/clear/<int:category_id>/', views.cart_clear, name='cart_clear'),
     path('cart/checkout/<int:category_id>/', views.cart_checkout, name='cart_checkout'),
+    
+    # Чеки (Receipts)
+    path('receipt/<int:order_id>/details/', views.receipt_details, name='receipt_details'),
+    path('receipt/<int:order_id>/download-pdf/', views.receipt_download_pdf, name='receipt_download_pdf'),
 ]

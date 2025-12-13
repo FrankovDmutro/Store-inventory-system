@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, F, Sum, DecimalField
@@ -11,7 +11,7 @@ import json
 import logging
 from .models import Product, Category, Order, OrderItem, Supplier, Purchase, PurchaseItem
 from .forms import SupplierForm, PurchaseItemForm, CartItemForm
-from .services import PurchaseService, OrderService, SupplierService
+from .services import PurchaseService, OrderService, SupplierService, ReceiptService
 from .utils import role_required, ROLE_CASHIER, ROLE_MANAGER
 
 logger = logging.getLogger(__name__)
@@ -622,3 +622,55 @@ def stats_dashboard(request):
         'top_categories': list(top_categories),
         'today': today,
     })
+
+
+# === РОБОТИ З ЧЕКАМИ (RECEIPTS) ===
+
+@login_required
+@role_required(ROLE_CASHIER)
+def receipt_details(request, order_id):
+    """
+    API endpoint для отримання даних чека у форматі JSON.
+    Використовується для виведення чека у модальному вікні.
+    """
+    try:
+        order = get_object_or_404(Order, id=order_id)
+        
+        # Генеруємо HTML чека
+        receipt_html = ReceiptService.generate_receipt_html(order)
+        
+        return JsonResponse({
+            'status': 'success',
+            'order_id': order.id,
+            'receipt_html': receipt_html,
+            'total': float(order.total_price),
+            'created_at': order.created_at.strftime('%d.%m.%Y %H:%M:%S')
+        })
+    except Exception as e:
+        logger.error(f"Error in receipt_details: {e}")
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=400)
+
+
+@login_required
+@role_required(ROLE_CASHIER)
+def receipt_download_pdf(request, order_id):
+    """
+    Endpoint для завантаження чека у форматі PDF.
+    """
+    try:
+        order = get_object_or_404(Order, id=order_id)
+        
+        # Генеруємо PDF
+        pdf_buffer = ReceiptService.generate_receipt_pdf(order)
+        
+        # Готуємо відповідь
+        response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="receipt_{order.id}.pdf"'
+        
+        return response
+    except Exception as e:
+        logger.error(f"Error in receipt_download_pdf: {e}")
+        return HttpResponse('Помилка при генеруванні PDF', status=400)
