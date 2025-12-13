@@ -3,7 +3,7 @@
   <td>{{ p.name }}</td>
   <td>{{ p.category.name }}</td>
   <td>{{ p.sku|default:'—' }}</td>
-  <td>{{ p.quantity }} {{ p.get_weight_unit_display }}</td>
+  <td>{{ p.quantity|floatformat:0 }}</td>
   <td>{{ p.price }} ₴</td>
   <td>{% if p.margin %}{{ p.margin }} ₴{% else %}—{% endif %}</td>
 </tr>
