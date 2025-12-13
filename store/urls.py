@@ -14,6 +14,8 @@ urlpatterns = [
     path('manager/products', lambda request: redirect('manager_products_list')),
     path('manager/suppliers/', views.suppliers_list, name='suppliers_list'),
     path('manager/suppliers', lambda request: redirect('suppliers_list')),
+    path('manager/stats/', views.stats_dashboard, name='stats_dashboard'),
+    path('manager/stats', lambda request: redirect('stats_dashboard')),
     path('category/<int:category_id>/', views.category_detail, name='category_detail'),
     
     # API для пошуку

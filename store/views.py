@@ -2,8 +2,8 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q, F, Sum
-from django.db import transaction
+from django.db.models import Q, F, Sum, DecimalField
+from django.db import transaction, models
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from decimal import Decimal, InvalidOperation
@@ -675,3 +675,76 @@ def create_purchase(request):
         return redirect('suppliers_list')
     
     return redirect('suppliers_list')
+
+
+@login_required
+@role_required(ROLE_MANAGER)
+def stats_dashboard(request):
+    """Статистика продажів, прибутку та товарів."""
+    from django.db.models import Sum, Count, Avg, Q
+    
+    # Загальні показники
+    total_orders = Order.objects.count()
+    total_sales = Order.objects.aggregate(Sum('total_price'))['total_price__sum'] or Decimal('0')
+    total_profit = Order.objects.aggregate(Sum('total_profit'))['total_profit__sum'] or Decimal('0')
+    avg_check = total_sales / total_orders if total_orders > 0 else Decimal('0')
+    
+    # Показники за сьогодні
+    today = timezone.localdate()
+    today_orders_qs = Order.objects.filter(created_at__date=today)
+    today_orders_count = today_orders_qs.count()
+    today_sales = today_orders_qs.aggregate(Sum('total_price'))['total_price__sum'] or Decimal('0')
+    today_profit = today_orders_qs.aggregate(Sum('total_profit'))['total_profit__sum'] or Decimal('0')
+    today_avg_check = today_sales / today_orders_count if today_orders_count > 0 else Decimal('0')
+    
+    # Топ товарів за продажами
+    top_products = OrderItem.objects.values('product__name').annotate(
+        qty_sold=Sum('quantity'),
+        revenue=Sum(F('quantity') * F('price'), output_field=DecimalField())
+    ).order_by('-revenue')[:10]
+    
+    # Стан товарів
+    low_stock = Product.objects.filter(quantity__lte=5).count()
+    out_of_stock = Product.objects.filter(quantity=0).count()
+    total_products = Product.objects.count()
+    total_stock_value = Product.objects.aggregate(
+        value=Sum(F('quantity') * F('purchase_price'), output_field=DecimalField())
+    )['value'] or Decimal('0')
+    
+    # Постачальники
+    supplier_count = Supplier.objects.count()
+    suppliers_active = Supplier.objects.filter(products__isnull=False).distinct().count()
+    
+    # Поставки
+    purchases_draft = Purchase.objects.filter(status='draft').count()
+    purchases_received = Purchase.objects.filter(status='received').count()
+    purchases_total = Purchase.objects.count()
+    
+    # Категорії - найпопулярніші
+    top_categories = OrderItem.objects.values('product__category__name').annotate(
+        qty=Sum('quantity'),
+        revenue=Sum(F('quantity') * F('price'), output_field=DecimalField())
+    ).order_by('-revenue')[:5]
+    
+    return render(request, 'store/stats_dashboard.html', {
+        'total_orders': total_orders,
+        'total_sales': total_sales,
+        'total_profit': total_profit,
+        'avg_check': avg_check,
+        'today_sales': today_sales,
+        'today_profit': today_profit,
+        'today_orders': today_orders_count,
+        'today_avg_check': today_avg_check,
+        'top_products': list(top_products),
+        'low_stock': low_stock,
+        'out_of_stock': out_of_stock,
+        'total_products': total_products,
+        'total_stock_value': total_stock_value,
+        'supplier_count': supplier_count,
+        'suppliers_active': suppliers_active,
+        'purchases_draft': purchases_draft,
+        'purchases_received': purchases_received,
+        'purchases_total': purchases_total,
+        'top_categories': list(top_categories),
+        'today': today,
+    })

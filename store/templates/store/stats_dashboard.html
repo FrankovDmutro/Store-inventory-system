@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Статистика</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f5f7fb; }
+        .stat-card { border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); }
+        .stat-value { font-size: 1.8rem; font-weight: 700; }
+        .stat-label { font-size: 0.9rem; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+    </style>
+</head>
+<body>
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">📊 Статистика</h2>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-primary">{{ today }}</span>
+            <span class="text-muted">👤 {{ user.username }}</span>
+            <form method="post" action="{% url 'logout' %}" class="mb-0">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-danger">Вихід</button>
+            </form>
+        </div>
+    </div>
+
+    {% include 'store/partials/manager_nav.html' %}
+
+    <!-- СЬОГОДНІ -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card bg-success text-white">
+                <div class="card-body">
+                    <div class="stat-label">Касса за сьогодні</div>
+                    <div class="stat-value">{{ today_sales|floatformat:2 }} ₴</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card bg-info text-white">
+                <div class="card-body">
+                    <div class="stat-label">Прибуток за сьогодні</div>
+                    <div class="stat-value">{{ today_profit|floatformat:2 }} ₴</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card bg-warning text-white">
+                <div class="card-body">
+                    <div class="stat-label">Чеків за сьогодні</div>
+                    <div class="stat-value">{{ today_orders }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card bg-secondary text-white">
+                <div class="card-body">
+                    <div class="stat-label">Середня чек</div>
+                    <div class="stat-value">{{ today_avg_check|floatformat:2 }} ₴</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ЗАГАЛЬНІ ПОКАЗНИКИ -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <div class="stat-label">Всього продано</div>
+                    <div class="stat-value text-success">{{ total_sales|floatformat:2 }} ₴</div>
+                    <small class="text-muted">за всю історію</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <div class="stat-label">Загальний прибуток</div>
+                    <div class="stat-value text-info">{{ total_profit|floatformat:2 }} ₴</div>
+                    <small class="text-muted">{{ total_orders }} чеків</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <div class="stat-label">Товарів на складі</div>
+                    <div class="stat-value text-primary">{{ total_products }}</div>
+                    <small class="text-muted">вартість: {{ total_stock_value|floatformat:2 }} ₴</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <div class="stat-label">Постачальники</div>
+                    <div class="stat-value text-warning">{{ supplier_count }}</div>
+                    <small class="text-muted">активних: {{ suppliers_active }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- СТАТУС ТОВАРІВ -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">⚠️ Статус товарів на складі</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h6>Низький залишок (≤5 шт)</h6>
+                            <h3 class="text-danger">{{ low_stock }}</h3>
+                        </div>
+                        <div class="col-6">
+                            <h6>Немає на складі (0 шт)</h6>
+                            <h3 class="text-danger">{{ out_of_stock }}</h3>
+                        </div>
+                    </div>
+                    <hr>
+                    <p class="text-muted mb-0">
+                        <span class="badge bg-success">✓ {{ total_products|add:"-"|add:low_stock|add:out_of_stock }}</span>
+                        товарів із хорошим залишком
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📦 Статус поставок</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <h6>Чернетка</h6>
+                            <h3 class="text-warning">{{ purchases_draft }}</h3>
+                        </div>
+                        <div class="col-4">
+                            <h6>Отримано</h6>
+                            <h3 class="text-success">{{ purchases_received }}</h3>
+                        </div>
+                        <div class="col-4">
+                            <h6>Всього</h6>
+                            <h3 class="text-primary">{{ purchases_total }}</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ТОП ПРОДУКТИ -->
+    {% if top_products %}
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">🏆 Топ товарів за виручкою</h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Товар</th>
+                                <th class="text-center">Продано</th>
+                                <th class="text-end">Виручка</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in top_products %}
+                            <tr>
+                                <td>{{ item.product__name }}</td>
+                                <td class="text-center">{{ item.qty_sold|floatformat:0 }} шт</td>
+                                <td class="text-end">{{ item.revenue|floatformat:2 }} ₴</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">🛍️ Топ категорій</h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Категорія</th>
+                                <th class="text-center">Продано</th>
+                                <th class="text-end">Виручка</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in top_categories %}
+                            <tr>
+                                <td>{{ item.product__category__name }}</td>
+                                <td class="text-center">{{ item.qty|floatformat:0 }} шт</td>
+                                <td class="text-end">{{ item.revenue|floatformat:2 }} ₴</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="text-center text-muted small mt-4 pb-4">
+        Остання оновлення: {{ today }}
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
