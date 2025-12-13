@@ -263,9 +263,16 @@ function loadSupplierProducts() {
     const productsList = document.getElementById('productsList');
     const supplierId = parseInt(currentSupplierId);
     
-    const supplierProducts = allProducts.filter(p => 
-        p.supplier_id === supplierId || p.supplier_id === null
-    );
+    // Вибір товарів цього постачальника та без постачальника
+    const supplierProducts = allProducts
+        .filter(p => p.supplier_id === supplierId || p.supplier_id === null)
+        // Сортуємо: найменший залишок зверху, потім за назвою
+        .sort((a, b) => {
+            const sa = Number(a.stock) || 0;
+            const sb = Number(b.stock) || 0;
+            if (sa !== sb) return sa - sb;
+            return (a.name || '').localeCompare(b.name || '');
+        });
     
     if (supplierProducts.length === 0) {
         productsList.innerHTML = '<p class="text-muted text-center">Немає товарів для цього постачальника</p>';
