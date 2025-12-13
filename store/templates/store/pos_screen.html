@@ -190,6 +190,156 @@
     const cartTotal = document.getElementById('cartTotal');
     const cartCount = document.getElementById('cartCount');
 
+    // === ПІДТРИМКА СКАНЕРА ШТРИХ-КОДІВ ===
+    let barcodeBuffer = '';
+    let barcodeTimeout = null;
+    const BARCODE_TIMEOUT = 100; // мілісекунди між символами для розпізнавання штрих-коду
+    
+    document.addEventListener('keypress', function(e) {
+        // Ігноруємо, якщо фокус на input полі (окрім поля пошуку при швидкому введенні)
+        const activeElement = document.activeElement;
+        const isInputField = activeElement.tagName === 'INPUT' || 
+                            activeElement.tagName === 'TEXTAREA' ||
+                            activeElement.isContentEditable;
+        
+        // Якщо це поле пошуку і введення повільне - дозволяємо звичайний пошук
+        if (activeElement.id === 'searchInput' && barcodeBuffer.length < 3) {
+            return;
+        }
+        
+        // Якщо це модальне вікно оплати - не обробляємо
+        const paymentModal = document.getElementById('paymentModal');
+        if (paymentModal && paymentModal.classList.contains('show')) {
+            return;
+        }
+        
+        const receiptModal = document.getElementById('receiptModal');
+        if (receiptModal && receiptModal.classList.contains('show')) {
+            return;
+        }
+        
+        // Скидаємо таймер
+        clearTimeout(barcodeTimeout);
+        
+        // Enter - завершення вводу штрих-коду
+        if (e.key === 'Enter' && barcodeBuffer.length >= 3) {
+            e.preventDefault();
+            processBarcodeInput(barcodeBuffer.trim());
+            barcodeBuffer = '';
+            return;
+        }
+        
+        // Збираємо символи (цифри, літери для артикулів)
+        if (e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey) {
+            barcodeBuffer += e.key;
+            
+            // Автоматично обробляємо, якщо набрано багато символів (довгий штрих-код)
+            if (barcodeBuffer.length >= 13) {
+                e.preventDefault();
+                processBarcodeInput(barcodeBuffer.trim());
+                barcodeBuffer = '';
+                return;
+            }
+            
+            // Встановлюємо таймер для скидання буфера
+            barcodeTimeout = setTimeout(() => {
+                // Якщо введення закінчилось і є дані - обробляємо
+                if (barcodeBuffer.length >= 3) {
+                    processBarcodeInput(barcodeBuffer.trim());
+                }
+                barcodeBuffer = '';
+            }, BARCODE_TIMEOUT);
+        }
+    });
+    
+    function processBarcodeInput(barcode) {
+        console.log('🔍 Сканер штрих-коду:', barcode);
+        
+        // Шукаємо товар по артикулу (SKU)
+        fetch(`/store/api/search/?q=${encodeURIComponent(barcode)}&category_id=${catId}`)
+        .then(res => res.ok ? res.json() : Promise.reject('Network error'))
+        .then(data => {
+            const allProducts = [...data.here, ...data.others];
+            
+            if (allProducts.length === 0) {
+                showBarcodeNotification('❌ Товар не знайдено', 'danger');
+                return;
+            }
+            
+            // Шукаємо точний збіг по SKU
+            let product = allProducts.find(p => p.sku && p.sku.toLowerCase() === barcode.toLowerCase());
+            
+            // Якщо не знайдено точний збіг, беремо перший результат
+            if (!product) {
+                product = allProducts[0];
+            }
+            
+            // Перевіряємо наявність
+            if (parseFloat(product.quantity) <= 0) {
+                showBarcodeNotification(`⚠️ ${product.name} - немає на складі`, 'warning');
+                return;
+            }
+            
+            // Додаємо товар у кошик
+            addProductToCart(product.id, product.name);
+        })
+        .catch(error => {
+            console.error('Помилка пошуку:', error);
+            showBarcodeNotification('❌ Помилка пошуку товару', 'danger');
+        });
+    }
+    
+    function addProductToCart(productId, productName) {
+        fetch(`/store/cart/add/${productId}/`, { 
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            credentials: 'same-origin'
+        })
+        .then(async res => {
+            const contentType = res.headers.get('content-type') || '';
+            if (!res.ok || !contentType.includes('application/json')) {
+                throw new Error(`Unexpected response: ${res.status}`);
+            }
+            return res.json();
+        })
+        .then(data => {
+            if(data.status === 'success') {
+                updateCartUI(data);
+                showBarcodeNotification(`✅ ${productName} додано`, 'success');
+            } else {
+                showBarcodeNotification(data.message || 'Помилка', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showBarcodeNotification('❌ Помилка додавання', 'danger');
+        });
+    }
+    
+    function showBarcodeNotification(message, type = 'info') {
+        // Створюємо повідомлення
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type} position-fixed top-0 start-50 translate-middle-x mt-5`;
+        notification.style.zIndex = '9999';
+        notification.style.minWidth = '300px';
+        notification.style.textAlign = 'center';
+        notification.style.fontSize = '1.1rem';
+        notification.style.fontWeight = 'bold';
+        notification.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+        notification.innerHTML = message;
+        
+        document.body.appendChild(notification);
+        
+        // Видаляємо через 2 секунди
+        setTimeout(() => {
+            notification.style.transition = 'opacity 0.3s';
+            notification.style.opacity = '0';
+            setTimeout(() => notification.remove(), 300);
+        }, 2000);
+    }
+
     // 1. ДОДАВАННЯ В КОШИК (AJAX)
     document.addEventListener('click', function(e) {
         const card = e.target.closest('.add-btn');
