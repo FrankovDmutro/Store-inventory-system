@@ -1,2 +1,96 @@
-# This file is kept for future form extensions
-# Current forms are handled via Django admin or session-based cart
+"""
+Django Forms для валідації даних.
+Thin Views, Fat Forms - валідація виноситься у форми.
+"""
+from django import forms
+from django.core.exceptions import ValidationError
+from .models import Supplier, Product
+
+
+class SupplierForm(forms.ModelForm):
+    """Форма для створення/редагування постачальника."""
+    
+    class Meta:
+        model = Supplier
+        fields = ['name', 'email', 'phone', 'address']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Назва постачальника'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'email@example.com'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+380XXXXXXXXX'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Адреса'})
+        }
+        labels = {
+            'name': 'Назва',
+            'email': 'Email',
+            'phone': 'Телефон',
+            'address': 'Адреса'
+        }
+    
+    def clean_name(self):
+        """Перевірка унікальності назви."""
+        name = self.cleaned_data.get('name')
+        if name:
+            # Якщо редагуємо існуючого постачальника, виключаємо його з перевірки
+            qs = Supplier.objects.filter(name__iexact=name)
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            
+            if qs.exists():
+                raise ValidationError(f'Постачальник з назвою "{name}" вже існує.')
+        return name
+
+
+class PurchaseItemForm(forms.Form):
+    """Форма для однієї позиції поставки."""
+    
+    product_id = forms.IntegerField(min_value=1, error_messages={
+        'required': 'Не вказано товар',
+        'invalid': 'Некоректний ID товару'
+    })
+    quantity = forms.IntegerField(min_value=1, error_messages={
+        'required': 'Не вказано кількість',
+        'min_value': 'Кількість має бути більше 0'
+    })
+    unit_cost = forms.DecimalField(min_value=0, decimal_places=2, error_messages={
+        'required': 'Не вказано ціну',
+        'min_value': 'Ціна не може бути від\'ємною'
+    })
+    
+    def clean_product_id(self):
+        """Перевірка існування товару."""
+        product_id = self.cleaned_data.get('product_id')
+        if product_id:
+            if not Product.objects.filter(id=product_id).exists():
+                raise ValidationError(f'Товар з ID {product_id} не існує.')
+        return product_id
+
+
+class CartItemForm(forms.Form):
+    """Форма для валідації товару в кошику."""
+    
+    product_id = forms.IntegerField(min_value=1)
+    quantity = forms.IntegerField(min_value=1)
+    
+    def clean_product_id(self):
+        """Перевірка існування товару."""
+        product_id = self.cleaned_data.get('product_id')
+        if product_id:
+            try:
+                self.product = Product.objects.get(id=product_id)
+            except Product.DoesNotExist:
+                raise ValidationError('Товар не знайдено.')
+        return product_id
+    
+    def clean(self):
+        """Перевірка наявності товару на складі."""
+        cleaned_data = super().clean()
+        quantity = cleaned_data.get('quantity')
+        
+        if hasattr(self, 'product') and quantity:
+            if self.product.quantity < quantity:
+                raise ValidationError(
+                    f'Недостатньо товару "{self.product.name}". '
+                    f'Доступно: {self.product.quantity}, потрібно: {quantity}'
+                )
+        
+        return cleaned_data

@@ -1,21 +1,21 @@
 from django.urls import path
-from django.shortcuts import redirect
+from django.views.generic import RedirectView
 from . import views
 
 urlpatterns = [
     path('', views.category_list, name='category_list'),
-    # Тримай сумісність: старий шлях редіректить на новий /manager
-    path('manager/', lambda request: redirect('manager_dashboard')),
-    path('manager', lambda request: redirect('manager_dashboard')),
+    # Редірект на manager dashboard
+    path('manager/', RedirectView.as_view(pattern_name='manager_dashboard', permanent=False)),
+    path('manager', RedirectView.as_view(pattern_name='manager_dashboard', permanent=False)),
     path('manager/dashboard/', views.manager_dashboard, name='manager_dashboard'),
     path('manager/receipts/', views.manager_receipts_list, name='manager_receipts_list'),
-    path('manager/receipts', lambda request: redirect('manager_receipts_list')),
+    path('manager/receipts', RedirectView.as_view(pattern_name='manager_receipts_list', permanent=False)),
     path('manager/products/', views.manager_products_list, name='manager_products_list'),
-    path('manager/products', lambda request: redirect('manager_products_list')),
+    path('manager/products', RedirectView.as_view(pattern_name='manager_products_list', permanent=False)),
     path('manager/suppliers/', views.suppliers_list, name='suppliers_list'),
-    path('manager/suppliers', lambda request: redirect('suppliers_list')),
+    path('manager/suppliers', RedirectView.as_view(pattern_name='suppliers_list', permanent=False)),
     path('manager/stats/', views.stats_dashboard, name='stats_dashboard'),
-    path('manager/stats', lambda request: redirect('stats_dashboard')),
+    path('manager/stats', RedirectView.as_view(pattern_name='stats_dashboard', permanent=False)),
     path('category/<int:category_id>/', views.category_detail, name='category_detail'),
     
     # API для пошуку

@@ -111,15 +111,16 @@ class Product(models.Model):
 
 
 class Purchase(models.Model):
-    STATUS_CHOICES = [
-        ('draft', 'Чернетка'),
-        ('ordered', 'Замовлено'),
-        ('received', 'Отримано'),
-        ('cancelled', 'Скасовано'),
-    ]
+    """Модель поставки товарів від постачальника."""
+    
+    class Status(models.TextChoices):
+        DRAFT = 'draft', 'Чернетка'
+        ORDERED = 'ordered', 'Замовлено'
+        RECEIVED = 'received', 'Отримано'
+        CANCELLED = 'cancelled', 'Скасовано'
 
     supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, related_name='purchases', verbose_name="Постачальник")
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name="Статус")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT, verbose_name="Статус")
     expected_date = models.DateTimeField(blank=True, null=True, verbose_name="Очікувана дата")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Створено")
     total_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0, validators=[MinValueValidator(Decimal('0.00'))], verbose_name="Загальна сума")
