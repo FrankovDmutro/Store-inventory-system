@@ -13,6 +13,9 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+import os
 from .models import Product, Supplier, Purchase, PurchaseItem, Order, OrderItem
 
 
@@ -205,6 +208,35 @@ class ReceiptService:
     """Сервіс для генерування чеків у HTML та PDF форматі."""
     
     @staticmethod
+    def _register_unicode_fonts():
+        """
+        Реєструємо Unicode шрифти для PDF.
+        Використовуємо вбудовані системні шрифти.
+        """
+        try:
+            # Спробуємо знайти системні шрифти Windows для Unicode підтримки
+            font_paths = [
+                r"C:\Windows\Fonts\arial.ttf",
+                r"C:\Windows\Fonts\Calibri.ttf",
+                r"C:\Windows\Fonts\Tahoma.ttf",
+            ]
+            
+            for font_path in font_paths:
+                if os.path.exists(font_path):
+                    # Реєструємо шрифт
+                    font_name = os.path.basename(font_path).replace('.ttf', '')
+                    try:
+                        pdfmetrics.registerFont(TTFont(font_name, font_path))
+                        return font_name
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+        
+        # Якщо не вдалось зареєструвати, повертаємо ім'я стандартного шрифту
+        return 'Helvetica'
+    
+    @staticmethod
     def generate_receipt_html(order):
         """
         Генерує HTML чека для відображення у модальному вікні.
@@ -268,7 +300,7 @@ class ReceiptService:
     @staticmethod
     def generate_receipt_pdf(order):
         """
-        Генерує PDF чека.
+        Генерує PDF чека з підтримкою Unicode символів.
         
         Args:
             order: Order - об'єкт замовлення
@@ -276,6 +308,12 @@ class ReceiptService:
         Returns:
             BytesIO - PDF файл у вигляді байтів
         """
+        from reportlab.pdfbase.pdfmetrics import registerFont
+        from reportlab.lib.styles import ParagraphStyle
+        
+        # Реєструємо шрифт для Unicode
+        font_name = ReceiptService._register_unicode_fonts()
+        
         # Визначаємо розміри для чека (як для теплового принтера)
         width = 80 * mm
         height = 200 * mm
@@ -291,29 +329,33 @@ class ReceiptService:
             bottomMargin=5*mm
         )
         
-        # Стилі
+        # Стилі з Unicode підтримкою
         styles = getSampleStyleSheet()
+        
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
             fontSize=12,
             textColor=colors.black,
             alignment=1,  # центрування
-            spaceAfter=5
+            spaceAfter=5,
+            fontName=font_name
         )
+        
         normal_style = ParagraphStyle(
             'CustomNormal',
             parent=styles['Normal'],
             fontSize=8,
             leading=10,
-            alignment=1
+            alignment=1,
+            fontName=font_name
         )
         
         # Елементи для PDF
         elements = []
         
-        # Заголовок
-        elements.append(Paragraph("🏪 КАССА", title_style))
+        # Заголовок (без emoji для сумісності з шрифтами)
+        elements.append(Paragraph("КАССА", title_style))
         elements.append(Paragraph(f"Чек №{order.id}", normal_style))
         elements.append(Paragraph(
             order.created_at.strftime('%d.%m.%Y %H:%M:%S'),
@@ -327,37 +369,57 @@ class ReceiptService:
         
         for item in items:
             item_total = item.quantity * item.price
+            # Обрізаємо довгі назви для вмісту в PDF
+            product_name = item.product.name[:20]
             table_data.append([
-                item.product.name[:15],  # Скорочуємо довгі назви
+                product_name,
                 str(item.quantity),
                 f"{item.price:.2f}",
                 f"{item_total:.2f}"
             ])
         
-        # Додаємо рядок з総сумою
-        table_data.append(['', '', 'РАЗОМ:', f"{order.total_price:.2f} ₴"])
+        # Додаємо рядок з сумою (без символу ₴ для сумісності)
+        table_data.append(['', '', 'РАЗОМ:', f"{order.total_price:.2f} грн"])
         
         # Стиль таблиці
         table = Table(table_data, colWidths=[2.5*cm, 1*cm, 1.2*cm, 1.2*cm])
         table.setStyle(TableStyle([
             ('FONTSIZE', (0, 0), (-1, -1), 7),
+            ('FONTNAME', (0, 0), (-1, -1), font_name),
             ('ALIGN', (0, 0), (0, -1), 'LEFT'),
             ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
             ('LINEBELOW', (0, 0), (-1, 0), 0.5, colors.black),
             ('LINEBELOW', (0, -1), (-1, -1), 0.5, colors.black),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
         ]))
         
         elements.append(table)
         elements.append(Spacer(1, 0.3*cm))
         
-        # Нижній текст
-        elements.append(Paragraph("Дякуємо за покупку! 😊", normal_style))
+        # Нижній текст (без emoji для сумісності з шрифтами)
+        elements.append(Paragraph("Дякуємо за покупку!", normal_style))
         
         # Будуємо PDF
-        doc.build(elements)
+        try:
+            doc.build(elements)
+        except Exception as e:
+            # Якщо виникла помилка, спробуємо без кастомного шрифту
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=(width, height),
+                rightMargin=5*mm,
+                leftMargin=5*mm,
+                topMargin=5*mm,
+                bottomMargin=5*mm
+            )
+            
+            # Переробляємо стилі зі стандартним шрифтом
+            title_style.fontName = 'Helvetica'
+            normal_style.fontName = 'Helvetica'
+            
+            doc.build(elements)
         
         # Повертаємо буфер на початок
         buffer.seek(0)
         return buffer
+
 
