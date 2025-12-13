@@ -1,0 +1,17 @@
+{% for o in orders %}
+<tr>
+  <td>{{ o.id }}</td>
+  <td>{{ o.created_at|date:'Y-m-d H:i' }}</td>
+  <td>{{ o.total_price }} ₴</td>
+  <td>{{ o.total_profit }} ₴</td>
+  <td>
+    {% for it in o.items.all %}
+      <span class="badge text-bg-light">{{ it.product.name }} × {{ it.quantity }}</span>
+    {% empty %}
+      —
+    {% endfor %}
+  </td>
+</tr>
+{% empty %}
+<tr><td colspan="5" class="text-center">Немає чеків</td></tr>
+{% endfor %}

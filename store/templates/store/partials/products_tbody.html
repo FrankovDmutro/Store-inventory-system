@@ -1,0 +1,12 @@
+{% for p in products %}
+<tr>
+  <td>{{ p.name }}</td>
+  <td>{{ p.category.name }}</td>
+  <td>{{ p.sku|default:'—' }}</td>
+  <td>{{ p.quantity }} {{ p.get_weight_unit_display }}</td>
+  <td>{{ p.price }} ₴</td>
+  <td>{% if p.margin %}{{ p.margin }} ₴{% else %}—{% endif %}</td>
+</tr>
+{% empty %}
+<tr><td colspan="6" class="text-center">Нічого не знайдено</td></tr>
+{% endfor %}

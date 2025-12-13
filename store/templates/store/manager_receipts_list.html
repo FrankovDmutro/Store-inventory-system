@@ -6,7 +6,11 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h3 class="mb-0">Список чеків</h3>
     <div class="d-flex gap-2">
-      <a class="btn btn-outline-secondary" href="{% url 'manager_dashboard' %}">⬅ Повернутися до панелі</a>
+      <div class="btn-group" role="group">
+        <a href="{% url 'manager_dashboard' %}" class="btn btn-outline-secondary">Панель</a>
+        <a href="{% url 'manager_receipts_list' %}" class="btn btn-outline-secondary active">Всі чеки</a>
+        <a href="{% url 'manager_products_list' %}" class="btn btn-outline-secondary">Всі товари</a>
+      </div>
       <form class="d-flex" method="get">
         <input type="date" name="date" class="form-control form-control-sm" value="{{ date }}">
         <button class="btn btn-sm btn-primary ms-2" type="submit">Фільтрувати</button>
