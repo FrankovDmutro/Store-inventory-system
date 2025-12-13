@@ -528,9 +528,10 @@ def create_purchase(request):
     """Формування поставки від постачальника."""
     if request.method == 'POST':
         expected_date = request.POST.get('expected_date')
+        expected_dates_json = request.POST.get('expected_dates_json', '{}')
         items_json = request.POST.get('items_json', '[]')
         
-        logger.info(f"create_purchase - items_json: {items_json}, expected_date: {expected_date}")
+        logger.info(f"create_purchase - items_json: {items_json}, expected_date: {expected_date}, expected_dates_json: {expected_dates_json}")
         
         try:
             items = json.loads(items_json)
@@ -552,6 +553,21 @@ def create_purchase(request):
             except (ValueError, TypeError) as e:
                 logger.warning(f"Date parse error: {e}")
                 pass
+
+        # Парсимо дати по постачальниках
+        supplier_dates = {}
+        try:
+            supplier_dates_raw = json.loads(expected_dates_json)
+            for sid, date_str in supplier_dates_raw.items():
+                try:
+                    dt = timezone.datetime.fromisoformat(date_str)
+                    if timezone.is_naive(dt):
+                        dt = timezone.make_aware(dt, timezone.get_current_timezone())
+                    supplier_dates[int(sid)] = dt
+                except Exception as e:
+                    logger.warning(f"Invalid supplier date for {sid}: {e}")
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.warning(f"expected_dates_json decode error: {e}")
         
         # Групуємо товари по постачальниках
         suppliers_items = {}
@@ -609,10 +625,13 @@ def create_purchase(request):
                 logger.error(f"Supplier {supplier_id} not found")
                 continue
             
+            # Визначаємо дату очікуваної доставки для цього постачальника
+            supplier_expected = supplier_dates.get(supplier_id, expected_date_obj)
+
             purchase = Purchase.objects.create(
                 supplier=supplier,
                 status='draft',
-                expected_date=expected_date_obj,
+                expected_date=supplier_expected,
             )
             
             total = Decimal('0')

@@ -10,9 +10,7 @@
         .supplier-item { cursor: pointer; transition: all 0.2s ease; }
         .supplier-item:hover { transform: translateX(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         .supplier-item.active { background: #e7f1ff; border-left: 4px solid #0d6efd; }
-        .products-list { max-height: 400px; overflow-y: auto; }
         .product-checkbox { width: 18px; height: 18px; margin-right: 10px; }
-        .draft-items { max-height: 350px; overflow-y: auto; }
         .badge-supplier { font-size: 0.85rem; padding: 0.4rem 0.6rem; }
         input[type="number"] { width: 80px; }
         /* Прибираємо стрілочки з readonly полів */
@@ -25,6 +23,33 @@
         input[type="number"][readonly]::-webkit-inner-spin-button {
             -webkit-appearance: none;
             margin: 0;
+        }
+        
+        /* Фіксована висота для колонок з окремим скролом */
+        .left-column, .right-column {
+            height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+        
+        .left-column .card, .right-column .card {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .left-column .card-body, .right-column .card-body {
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .products-list {
+            max-height: none;
+            overflow-y: visible;
+        }
+        
+        .draft-items {
+            max-height: none;
+            overflow-y: visible;
         }
     </style>
 </head>
@@ -56,7 +81,7 @@
 
     <div class="row g-4">
         <!-- ЛІВА КОЛОНА: Список постачальників та додавання -->
-        <div class="col-lg-4">
+        <div class="col-lg-3 left-column">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">📋 Постачальники</h5>
@@ -104,57 +129,83 @@
         </div>
 
         <!-- ПРАВОРУЧ: Формування поставки та товари постачальника -->
-        <div class="col-lg-8">
-            <!-- Вибір товарів -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">📦 Доступні товари</h5>
-                    <small class="text-muted">Виберіть постачальника зліва або додайте будь-які товари</small>
+        <div class="col-lg-9 right-column">
+            <div class="row g-4 h-100">
+                <!-- Доступні товари -->
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h5 class="mb-1">📦 Доступні товари</h5>
+                            <small class="text-muted">Виберіть постачальника зліва</small>
+                        </div>
+                        <div class="card-body">
+                            <input type="text" id="searchProducts" class="form-control mb-3" placeholder="Пошук товару...">
+                            <div id="productsList">
+                                <p class="text-muted text-center">Виберіть постачальника зліва</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <input type="text" id="searchProducts" class="form-control mb-3" placeholder="Пошук товару...">
-                    <div class="products-list" id="productsList">
-                        <p class="text-muted text-center">Виберіть постачальника зліва або використайте пошук</p>
+
+                <!-- Формування поставки -->
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">📝 Формування поставки</h5>
+                            <div>
+                                <button type="button" class="btn btn-sm btn-warning" id="clearDraftBtn" style="display:none;">Очистити</button>
+                                <button type="button" class="btn btn-sm btn-success" id="openConfirmModalBtn" style="display:none;">✓ Перевірити та створити</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <form id="purchaseForm" method="post" action="{% url 'create_purchase' %}">
+                                {% csrf_token %}
+                                <input type="hidden" id="items_json" name="items_json" value="[]">
+                                <input type="hidden" id="expected_dates_json" name="expected_dates_json" value="{}">
+                                
+                                <div class="mb-3">
+                                    <label for="expected_date" class="form-label">Очікувана дата доставки</label>
+                                    <input type="datetime-local" id="expected_date" name="expected_date" class="form-control">
+                                </div>
+
+                                <div id="draftItems">
+                                    <p class="text-muted text-center">Товари з'являться тут</p>
+                                </div>
+
+                                <hr>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <small class="text-muted">Загальна вартість:</small>
+                                        <h5 id="totalCost" class="text-success mb-0">0.00 ₴</h5>
+                                    </div>
+                                    <div class="col-6 text-end">
+                                        <small class="text-muted">Кількість позицій:</small>
+                                        <h5 id="itemsCount" class="text-info mb-0">0</h5>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
 
-            <!-- Черновик поставки -->
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">📝 Формування поставки</h5>
-                    <div>
-                        <button type="button" class="btn btn-sm btn-warning" id="clearDraftBtn" style="display:none;">Очистити</button>
-                        <button type="submit" form="purchaseForm" class="btn btn-sm btn-success" id="submitPurchaseBtn" style="display:none;">✓ Створити поставку</button>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <form id="purchaseForm" method="post" action="{% url 'create_purchase' %}">
-                        {% csrf_token %}
-                        <input type="hidden" id="items_json" name="items_json" value="[]">
-                        
-                        <div class="mb-3">
-                            <label for="expected_date" class="form-label">Очікувана дата доставки</label>
-                            <input type="datetime-local" id="expected_date" name="expected_date" class="form-control">
-                        </div>
-
-                        <div class="draft-items" id="draftItems">
-                            <p class="text-muted text-center">Товари з'являться тут</p>
-                        </div>
-
-                        <hr>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h6>Загальна вартість:</h6>
-                                <h5 id="totalCost" class="text-success">0.00 ₴</h5>
-                            </div>
-                            <div class="col-md-6 text-end">
-                                <h6>Кількість позицій:</h6>
-                                <h5 id="itemsCount" class="text-info">0</h5>
-                            </div>
-                        </div>
-                    </form>
-                </div>
+<!-- МОДАЛЬ ПІДТВЕРДЖЕННЯ: Поставка по постачальниках -->
+<div class="modal fade" id="confirmPurchaseModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Підтвердження поставки</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="suppliersGroupsContainer"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                <button type="button" class="btn btn-primary" id="confirmCreatePurchasesBtn">Створити поставки</button>
             </div>
         </div>
     </div>
@@ -289,7 +340,7 @@ function updateDraftDisplay() {
     
     if (items.length === 0) {
         draftDiv.innerHTML = '<p class="text-muted text-center">Товари з\'являться тут</p>';
-        document.getElementById('submitPurchaseBtn').style.display = 'none';
+        document.getElementById('openConfirmModalBtn').style.display = 'none';
         document.getElementById('clearDraftBtn').style.display = 'none';
         document.getElementById('totalCost').textContent = '0.00 ₴';
         document.getElementById('itemsCount').textContent = '0';
@@ -378,7 +429,7 @@ function updateDraftDisplay() {
     }));
     document.getElementById('items_json').value = JSON.stringify(itemsToSend);
     
-    document.getElementById('submitPurchaseBtn').style.display = 'inline-block';
+    document.getElementById('openConfirmModalBtn').style.display = 'inline-block';
     document.getElementById('clearDraftBtn').style.display = 'inline-block';
 }
 
@@ -404,14 +455,95 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Відправка форми
-    document.getElementById('purchaseForm').addEventListener('submit', function(e) {
+    // Відкриття модалі підтвердження
+    document.getElementById('openConfirmModalBtn').addEventListener('click', function() {
         const items = Object.values(draftItems);
         if (items.length === 0) {
-            e.preventDefault();
             alert('Додайте товари до поставки');
-            return false;
+            return;
         }
+        // Побудова груп постачальників
+        const container = document.getElementById('suppliersGroupsContainer');
+        container.innerHTML = '';
+
+        const groups = {};
+        items.forEach(item => {
+            const product = allProducts.find(p => p.id === item.product_id);
+            const sid = product && product.supplier_id ? product.supplier_id : null;
+            const sname = product && product.supplier_name ? product.supplier_name : 'Без постачальника';
+            if (!groups[sid]) groups[sid] = { name: sname, items: [] };
+            groups[sid].items.push(item);
+        });
+
+        let html = '';
+        Object.entries(groups).forEach(([sid, group]) => {
+            let total = 0;
+            let rows = '';
+            group.items.forEach(it => {
+                const sum = parseInt(it.quantity) * parseFloat(it.unit_cost);
+                total += sum;
+                rows += `
+                    <tr>
+                        <td>${it.name}</td>
+                        <td class="text-center">${parseInt(it.quantity)}</td>
+                        <td class="text-end">${parseFloat(it.unit_cost).toFixed(2)} ₴</td>
+                        <td class="text-end">${sum.toFixed(2)} ₴</td>
+                    </tr>`;
+            });
+            const sidAttr = sid === null ? 'none' : sid;
+            const disabled = sidAttr === 'none' ? 'disabled' : '';
+            const warn = sidAttr === 'none' ? '<div class="text-danger small px-3 pb-2">Товари без постачальника не будуть створені як поставка.</div>' : '';
+            html += `
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <strong>Постачальник: ${group.name}</strong>
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="small text-muted">Очікувана дата</label>
+                            <input type="datetime-local" class="form-control form-control-sm expected-date-input" data-supplier-id="${sidAttr}" ${disabled}>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Товар</th>
+                                    <th class="text-center">Кількість</th>
+                                    <th class="text-end">Ціна за од.</th>
+                                    <th class="text-end">Разом</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                            <tfoot>
+                                <tr>
+                                    <th colspan="3" class="text-end">Всього:</th>
+                                    <th class="text-end">${total.toFixed(2)} ₴</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        ${warn}
+                    </div>
+                </div>`;
+        });
+
+        container.innerHTML = html;
+        new bootstrap.Modal(document.getElementById('confirmPurchaseModal')).show();
+    });
+
+    // Підтвердження створення поставок
+    document.getElementById('confirmCreatePurchasesBtn').addEventListener('click', function() {
+        const inputs = document.querySelectorAll('#confirmPurchaseModal .expected-date-input');
+        const mapping = {};
+        inputs.forEach(inp => {
+            const sid = inp.getAttribute('data-supplier-id');
+            const val = inp.value;
+            if (sid && sid !== 'none' && val) mapping[sid] = val;
+        });
+        document.getElementById('expected_dates_json').value = JSON.stringify(mapping);
+        // Закрити модаль і надіслати форму
+        const modalEl = document.getElementById('confirmPurchaseModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+        document.getElementById('purchaseForm').submit();
     });
     
     // Пошук товарів
