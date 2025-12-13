@@ -105,6 +105,37 @@
         </div>
     </div>
 
+    <!-- Повернення та потенційні збитки -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card bg-danger text-white">
+                <div class="card-body">
+                    <div class="stat-label">Сума повернень за сьогодні</div>
+                    <div class="stat-value">{{ returns_today_refund|floatformat:2|intcomma }} ₴</div>
+                    <small class="text-light">кількість: {{ returns_today_count }}</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card bg-danger text-white" style="background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);">
+                <div class="card-body">
+                    <div class="stat-label">Загальна сума повернень</div>
+                    <div class="stat-value">{{ returns_total_refund|floatformat:2|intcomma }} ₴</div>
+                    <small class="text-light">усього повернень: {{ returns_count }}</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card bg-warning text-white">
+                <div class="card-body">
+                    <div class="stat-label">Потенційний збиток ({{ soon_days }} днів)</div>
+                    <div class="stat-value">{{ potential_expiry_loss|floatformat:2|intcomma }} ₴</div>
+                    <small class="text-light">ймовірно прострочиться до цієї дати</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- СТАТУС ТОВАРІВ -->
     <div class="row g-3 mb-4">
         <div class="col-md-6">

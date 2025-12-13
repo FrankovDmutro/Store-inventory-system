@@ -597,6 +597,30 @@ def stats_dashboard(request):
     total_stock_value = Product.objects.aggregate(
         value=Sum(F('quantity') * F('purchase_price'), output_field=DecimalField())
     )['value'] or Decimal('0')
+
+    # Повернення (рефунди)
+    # Агрегацію по сумах робимо на ReturnItem
+    returns_total_refund = ReturnItem.objects.aggregate(
+        total=Sum(F('quantity') * F('unit_price'), output_field=DecimalField())
+    )['total'] or Decimal('0')
+    returns_today_refund = ReturnItem.objects.filter(
+        return_instance__created_at__date=today
+    ).aggregate(
+        total=Sum(F('quantity') * F('unit_price'), output_field=DecimalField())
+    )['total'] or Decimal('0')
+    returns_count = Return.objects.count()
+    returns_today_count = Return.objects.filter(created_at__date=today).count()
+
+    # Потенційний збиток (ймовірно прострочиться невдовзі)
+    soon_days = 14
+    soon_threshold = timezone.now().date() + timedelta(days=soon_days)
+    potential_expiry_loss = Product.objects.filter(
+        expiry_date__isnull=False,
+        expiry_date__lte=soon_threshold,
+        quantity__gt=0
+    ).aggregate(
+        total=Sum(F('quantity') * F('purchase_price'), output_field=DecimalField())
+    )['total'] or Decimal('0')
     
     # Постачальники
     supplier_count = Supplier.objects.count()
@@ -639,6 +663,12 @@ def stats_dashboard(request):
         'purchases_total': purchases_total,
         'top_categories': list(top_categories),
         'today': today,
+        'returns_total_refund': returns_total_refund,
+        'returns_today_refund': returns_today_refund,
+        'returns_count': returns_count,
+        'returns_today_count': returns_today_count,
+        'potential_expiry_loss': potential_expiry_loss,
+        'soon_days': soon_days,
     })
 
 
