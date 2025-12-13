@@ -707,6 +707,7 @@ def stats_dashboard(request):
     low_stock = Product.objects.filter(quantity__lte=5).count()
     out_of_stock = Product.objects.filter(quantity=0).count()
     total_products = Product.objects.count()
+    good_stock = total_products - low_stock - out_of_stock
     total_stock_value = Product.objects.aggregate(
         value=Sum(F('quantity') * F('purchase_price'), output_field=DecimalField())
     )['value'] or Decimal('0')
@@ -717,7 +718,9 @@ def stats_dashboard(request):
     
     # Поставки
     purchases_draft = Purchase.objects.filter(status='draft').count()
+    purchases_ordered = Purchase.objects.filter(status='ordered').count()
     purchases_received = Purchase.objects.filter(status='received').count()
+    purchases_cancelled = Purchase.objects.filter(status='cancelled').count()
     purchases_total = Purchase.objects.count()
     
     # Категорії - найпопулярніші
@@ -738,12 +741,15 @@ def stats_dashboard(request):
         'top_products': list(top_products),
         'low_stock': low_stock,
         'out_of_stock': out_of_stock,
+        'good_stock': good_stock,
         'total_products': total_products,
         'total_stock_value': total_stock_value,
         'supplier_count': supplier_count,
         'suppliers_active': suppliers_active,
         'purchases_draft': purchases_draft,
+        'purchases_ordered': purchases_ordered,
         'purchases_received': purchases_received,
+        'purchases_cancelled': purchases_cancelled,
         'purchases_total': purchases_total,
         'top_categories': list(top_categories),
         'today': today,
