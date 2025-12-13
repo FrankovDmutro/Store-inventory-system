@@ -6,6 +6,7 @@
     <a href="{% url 'manager_receipts_list' %}" class="btn btn-outline-secondary {% if url_name == 'manager_receipts_list' %}active{% endif %}">Всі чеки</a>
     <a href="{% url 'manager_products_list' %}" class="btn btn-outline-secondary {% if url_name == 'manager_products_list' %}active{% endif %}">Всі товари</a>
     <a href="{% url 'suppliers_list' %}" class="btn btn-outline-secondary {% if url_name == 'suppliers_list' %}active{% endif %}">Поставки</a>
+    <a href="{% url 'writeoffs_list' %}" class="btn btn-outline-danger {% if url_name == 'writeoffs_list' or url_name == 'writeoff_create' or url_name == 'expired_products' %}active{% endif %}">Списання</a>
   </div>
   {% endwith %}
 </div>

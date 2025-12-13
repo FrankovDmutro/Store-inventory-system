@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Category, Product, Order, OrderItem, Supplier, Purchase, PurchaseItem
+from .models import Category, Product, Order, OrderItem, Supplier, Purchase, PurchaseItem, WriteOff
 
 # === КАТЕГОРІЇ ===
 class CategoryAdmin(admin.ModelAdmin):
@@ -137,3 +137,24 @@ class PurchaseAdmin(admin.ModelAdmin):
 
 admin.site.register(Supplier, SupplierAdmin)
 admin.site.register(Purchase, PurchaseAdmin)
+
+
+# === СПИСАННЯ ===
+class WriteOffAdmin(admin.ModelAdmin):
+    list_display = ['id', 'product', 'quantity', 'reason', 'manager', 'created_at', 'total_loss_display']
+    list_filter = ['reason', 'created_at', 'manager']
+    date_hierarchy = 'created_at'
+    search_fields = ['product__name', 'comment']
+    readonly_fields = ['created_at', 'purchase_price', 'total_loss_display']
+    
+    def total_loss_display(self, obj):
+        if obj.pk is None:
+            return "-"
+        return f"{obj.get_total_loss():.2f} грн"
+    total_loss_display.short_description = 'Збитки'
+    
+    def has_delete_permission(self, request, obj=None):
+        # Тільки суперюзер може видаляти списання
+        return request.user.is_superuser
+
+admin.site.register(WriteOff, WriteOffAdmin)

@@ -16,6 +16,13 @@ urlpatterns = [
     path('manager/suppliers', RedirectView.as_view(pattern_name='suppliers_list', permanent=False)),
     path('manager/stats/', views.stats_dashboard, name='stats_dashboard'),
     path('manager/stats', RedirectView.as_view(pattern_name='stats_dashboard', permanent=False)),
+    
+    # Списання
+    path('manager/writeoffs/', views.writeoffs_list, name='writeoffs_list'),
+    path('manager/writeoffs', RedirectView.as_view(pattern_name='writeoffs_list', permanent=False)),
+    path('manager/writeoffs/create/', views.writeoff_create, name='writeoff_create'),
+    path('manager/expired-products/', views.expired_products, name='expired_products'),
+    
     path('category/<int:category_id>/', views.category_detail, name='category_detail'),
     
     # API для пошуку

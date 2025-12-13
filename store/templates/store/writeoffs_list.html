@@ -1,0 +1,143 @@
+{% extends 'store/base.html' %}
+
+{% block title %}Списання товарів{% endblock %}
+
+{% block content %}
+{% include 'store/partials/manager_nav.html' %}
+
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>📋 Списання товарів</h2>
+                <div>
+                    <a href="{% url 'expired_products' %}" class="btn btn-warning me-2">
+                        ⚠️ Прострочені товари
+                    </a>
+                    <a href="{% url 'writeoff_create' %}" class="btn btn-primary">
+                        ➕ Нове списання
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Статистика -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-white bg-danger">
+                <div class="card-body">
+                    <h6 class="card-title">Збитки за сьогодні</h6>
+                    <h3>{{ today_loss|floatformat:2 }} грн</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h6 class="card-title">Збитки за місяць</h6>
+                    <h3>{{ month_loss|floatformat:2 }} грн</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-secondary">
+                <div class="card-body">
+                    <h6 class="card-title">Загальні збитки</h6>
+                    <h3>{{ total_loss|floatformat:2 }} грн</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Фільтри -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Причина списання</label>
+                    <select name="reason" class="form-select">
+                        <option value="">Всі</option>
+                        {% for value, label in reasons %}
+                        <option value="{{ value }}" {% if reason_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Дата від</label>
+                    <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Дата до</label>
+                    <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">🔍 Фільтрувати</button>
+                    <a href="{% url 'writeoffs_list' %}" class="btn btn-secondary">Скинути</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Таблиця списань -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Дата</th>
+                            <th>Товар</th>
+                            <th>Кількість</th>
+                            <th>Причина</th>
+                            <th>Менеджер</th>
+                            <th>Збитки</th>
+                            <th>Коментар</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for writeoff in writeoffs %}
+                        <tr>
+                            <td>{{ writeoff.id }}</td>
+                            <td>{{ writeoff.created_at|date:"d.m.Y H:i" }}</td>
+                            <td>
+                                <strong>{{ writeoff.product.name }}</strong><br>
+                                <small class="text-muted">{{ writeoff.product.sku|default:"-" }}</small>
+                            </td>
+                            <td><span class="badge bg-warning text-dark">{{ writeoff.quantity }} шт</span></td>
+                            <td>
+                                {% if writeoff.reason == 'damage' %}
+                                    <span class="badge bg-danger">{{ writeoff.get_reason_display }}</span>
+                                {% elif writeoff.reason == 'expiry' %}
+                                    <span class="badge bg-warning text-dark">{{ writeoff.get_reason_display }}</span>
+                                {% elif writeoff.reason == 'defect' %}
+                                    <span class="badge bg-secondary">{{ writeoff.get_reason_display }}</span>
+                                {% else %}
+                                    <span class="badge bg-info">{{ writeoff.get_reason_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ writeoff.manager.username|default:"—" }}</td>
+                            <td class="text-danger fw-bold">-{{ writeoff.get_total_loss|floatformat:2 }} грн</td>
+                            <td>
+                                {% if writeoff.comment %}
+                                    <small>{{ writeoff.comment|truncatewords:10 }}</small>
+                                {% else %}
+                                    <small class="text-muted">—</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-5">
+                                Списань не знайдено
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

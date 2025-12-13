@@ -4,7 +4,7 @@ Thin Views, Fat Forms - валідація виноситься у форми.
 """
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import Supplier, Product
+from .models import Supplier, Product, WriteOff
 
 
 class SupplierForm(forms.ModelForm):
@@ -92,5 +92,47 @@ class CartItemForm(forms.Form):
                     f'Недостатньо товару "{self.product.name}". '
                     f'Доступно: {self.product.quantity}, потрібно: {quantity}'
                 )
+        
+        return cleaned_data
+
+
+class WriteOffForm(forms.ModelForm):
+    """Форма для списання товарів."""
+    
+    class Meta:
+        model = WriteOff
+        fields = ['product', 'quantity', 'reason', 'comment']
+        widgets = {
+            'product': forms.Select(attrs={'class': 'form-select'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
+            'reason': forms.Select(attrs={'class': 'form-select'}),
+            'comment': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Додатковий коментар (необов\'язково)'}),
+        }
+        labels = {
+            'product': 'Товар',
+            'quantity': 'Кількість для списання',
+            'reason': 'Причина списання',
+            'comment': 'Коментар'
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Показуємо тільки товари, які є на складі
+        products = Product.objects.filter(quantity__gt=0).select_related('category').order_by('name')
+        # Додаємо кількість до label
+        choices = [(p.id, f"{p.name} ({p.quantity} шт)") for p in products]
+        self.fields['product'].choices = [('', '---------')] + choices
+    
+    def clean(self):
+        """Валідація наявності товару перед списанням."""
+        cleaned_data = super().clean()
+        product = cleaned_data.get('product')
+        quantity = cleaned_data.get('quantity')
+        
+        if product and quantity:
+            if product.quantity < quantity:
+                raise ValidationError({
+                    'quantity': f'Недостатньо товару на складі. Доступно: {product.quantity} шт.'
+                })
         
         return cleaned_data

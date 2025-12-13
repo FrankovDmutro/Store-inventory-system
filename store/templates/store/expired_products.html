@@ -1,0 +1,153 @@
+{% extends 'store/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Прострочені товари{% endblock %}
+
+{% block content %}
+{% include 'store/partials/manager_nav.html' %}
+
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>⚠️ Контроль термінів придатності</h2>
+                <a href="{% url 'writeoffs_list' %}" class="btn btn-secondary">
+                    ← Повернутись до списань
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Статистика потенційних збитків -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card text-white bg-danger">
+                <div class="card-body">
+                    <h6 class="card-title">❌ Прострочені товари</h6>
+                    <h3>{{ expired.count }} товарів</h3>
+                    <p class="mb-0">Потенційні збитки: <strong>{{ expired_loss|floatformat:2 }} грн</strong></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h6 class="card-title text-dark">⏰ Термін закінчується ({{ warning_days }} днів)</h6>
+                    <h3 class="text-dark">{{ expiring_soon.count }} товарів</h3>
+                    <p class="mb-0 text-dark">Потенційні збитки: <strong>{{ expiring_loss|floatformat:2 }} грн</strong></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Прострочені товари -->
+    {% if expired %}
+    <div class="card mb-4">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0">❌ Прострочені товари (потрібно списати)</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Товар</th>
+                            <th>Артикул</th>
+                            <th>Категорія</th>
+                            <th>Термін придатності</th>
+                            <th>Прострочено</th>
+                            <th>Кількість</th>
+                            <th>Збитки</th>
+                            <th>Дія</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in expired %}
+                        <tr class="table-danger">
+                            <td><strong>{{ product.name }}</strong></td>
+                            <td>{{ product.sku|default:"—" }}</td>
+                            <td>{{ product.category.name }}</td>
+                            <td>{{ product.expiry_date|date:"d.m.Y" }}</td>
+                            <td>
+                                {% with days_expired=product.expiry_date|timesince %}
+                                <span class="badge bg-danger">{{ days_expired }} тому</span>
+                                {% endwith %}
+                            </td>
+                            <td><span class="badge bg-warning text-dark">{{ product.quantity }} шт</span></td>
+                            <td class="text-danger fw-bold">
+                                {{ product.quantity|mul:product.purchase_price|floatformat:2 }} грн
+                            </td>
+                            <td>
+                                <a href="{% url 'writeoff_create' %}?product={{ product.id }}&reason=expiry" 
+                                   class="btn btn-sm btn-danger">
+                                    Списати
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-success">
+        <h5>✅ Прострочених товарів немає</h5>
+        <p class="mb-0">Всі товари з терміном придатності мають актуальні дати.</p>
+    </div>
+    {% endif %}
+
+    <!-- Товари, що скоро закінчуються -->
+    {% if expiring_soon %}
+    <div class="card">
+        <div class="card-header bg-warning">
+            <h5 class="mb-0">⏰ Термін закінчується найближчим часом</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Товар</th>
+                            <th>Артикул</th>
+                            <th>Категорія</th>
+                            <th>Термін придатності</th>
+                            <th>Залишилось днів</th>
+                            <th>Кількість</th>
+                            <th>Потенційні збитки</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in expiring_soon %}
+                        <tr class="table-warning">
+                            <td><strong>{{ product.name }}</strong></td>
+                            <td>{{ product.sku|default:"—" }}</td>
+                            <td>{{ product.category.name }}</td>
+                            <td>{{ product.expiry_date|date:"d.m.Y" }}</td>
+                            <td>
+                                {% with days_left=product.expiry_date|timeuntil %}
+                                <span class="badge bg-warning text-dark">{{ days_left }}</span>
+                                {% endwith %}
+                            </td>
+                            <td><span class="badge bg-info">{{ product.quantity }} шт</span></td>
+                            <td class="text-warning fw-bold">
+                                {{ product.quantity|mul:product.purchase_price|floatformat:2 }} грн
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <h5>ℹ️ Товарів, що скоро прострочуються, немає</h5>
+        <p class="mb-0">Найближчими {{ warning_days }} днями терміни придатності не закінчуються.</p>
+    </div>
+    {% endif %}
+</div>
+
+{% load custom_filters %}
+
+{% endblock %}

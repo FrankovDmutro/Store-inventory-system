@@ -1,7 +1,9 @@
 import random
 from decimal import Decimal, ROUND_HALF_UP
+from datetime import timedelta
 from django.core.management.base import BaseCommand
-from store.models import Product, Category, Supplier, Order, OrderItem, Purchase, PurchaseItem
+from django.utils import timezone
+from store.models import Product, Category, Supplier, Order, OrderItem, Purchase, PurchaseItem, WriteOff
 from faker import Faker
 
 
@@ -19,9 +21,10 @@ class Command(BaseCommand):
             'Фрукти': ['Яблуко', 'Банан', 'Апельсин', 'Лимон', 'Груша']
         }
 
-        self.stdout.write(self.style.WARNING("⚠️ Видаляю старі дані (чеки, поставки, товари)..."))
+        self.stdout.write(self.style.WARNING("⚠️ Видаляю старі дані (чеки, списання, поставки, товари)..."))
         OrderItem.objects.all().delete()
         Order.objects.all().delete()
+        WriteOff.objects.all().delete()
         PurchaseItem.objects.all().delete()
         Purchase.objects.all().delete()
         Product.objects.all().delete()
@@ -56,6 +59,18 @@ class Command(BaseCommand):
                     quantity = Decimal(random.randint(0, 120))
 
                     supplier = random.choice(cat_suppliers) if cat_suppliers else None
+                    
+                    # Додаємо термін придатності для певних категорій
+                    expiry_date = None
+                    if cat_name in ['Напої', 'Молочка', 'Фрукти']:
+                        # Для скоропсувних продуктів - від 7 до 90 днів
+                        days_until_expiry = random.randint(7, 90)
+                        expiry_date = (timezone.now() + timedelta(days=days_until_expiry)).date()
+                    elif cat_name == 'Снеки':
+                        # Для снеків - від 30 до 180 днів
+                        days_until_expiry = random.randint(30, 180)
+                        expiry_date = (timezone.now() + timedelta(days=days_until_expiry)).date()
+                    # Для бакалії термін не ставимо (або дуже довгий)
 
                     Product.objects.create(
                         category=category,
@@ -67,6 +82,7 @@ class Command(BaseCommand):
                         purchase_price=purchase_price,
                         price=price,
                         quantity=quantity,
+                        expiry_date=expiry_date,
                         description=fake.text(max_nb_chars=60)
                     )
                     total_created += 1

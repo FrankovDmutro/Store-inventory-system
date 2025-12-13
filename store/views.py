@@ -7,10 +7,11 @@ from django.db import transaction, models
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from decimal import Decimal, InvalidOperation
+from datetime import timedelta
 import json
 import logging
-from .models import Product, Category, Order, OrderItem, Supplier, Purchase, PurchaseItem
-from .forms import SupplierForm, PurchaseItemForm, CartItemForm
+from .models import Product, Category, Order, OrderItem, Supplier, Purchase, PurchaseItem, WriteOff
+from .forms import SupplierForm, PurchaseItemForm, CartItemForm, WriteOffForm
 from .services import PurchaseService, OrderService, SupplierService, ReceiptService
 from .utils import role_required, ROLE_CASHIER, ROLE_MANAGER
 
@@ -621,6 +622,139 @@ def stats_dashboard(request):
         'purchases_total': purchases_total,
         'top_categories': list(top_categories),
         'today': today,
+    })
+
+
+# === СПИСАННЯ ТОВАРІВ ===
+
+@login_required
+@role_required(ROLE_MANAGER)
+def writeoffs_list(request):
+    """Перегляд всіх списань з фільтрами."""
+    
+    # Фільтри
+    reason_filter = request.GET.get('reason', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    
+    writeoffs = WriteOff.objects.select_related('product', 'manager').all()
+    
+    if reason_filter:
+        writeoffs = writeoffs.filter(reason=reason_filter)
+    
+    if date_from:
+        try:
+            from_date = timezone.datetime.strptime(date_from, '%Y-%m-%d').date()
+            writeoffs = writeoffs.filter(created_at__date__gte=from_date)
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            to_date = timezone.datetime.strptime(date_to, '%Y-%m-%d').date()
+            writeoffs = writeoffs.filter(created_at__date__lte=to_date)
+        except ValueError:
+            pass
+    
+    writeoffs = writeoffs.order_by('-created_at')[:100]
+    
+    # Статистика
+    total_loss = WriteOff.objects.aggregate(
+        total=Sum(F('quantity') * F('purchase_price'), output_field=DecimalField())
+    )['total'] or Decimal('0')
+    
+    today = timezone.localdate()
+    today_loss = WriteOff.objects.filter(created_at__date=today).aggregate(
+        total=Sum(F('quantity') * F('purchase_price'), output_field=DecimalField())
+    )['total'] or Decimal('0')
+    
+    month_loss = WriteOff.objects.filter(
+        created_at__date__gte=today.replace(day=1)
+    ).aggregate(
+        total=Sum(F('quantity') * F('purchase_price'), output_field=DecimalField())
+    )['total'] or Decimal('0')
+    
+    return render(request, 'store/writeoffs_list.html', {
+        'writeoffs': writeoffs,
+        'total_loss': total_loss,
+        'today_loss': today_loss,
+        'month_loss': month_loss,
+        'reason_filter': reason_filter,
+        'date_from': date_from,
+        'date_to': date_to,
+        'reasons': WriteOff.Reason.choices,
+    })
+
+
+@login_required
+@role_required(ROLE_MANAGER)
+@transaction.atomic
+def writeoff_create(request):
+    """Створення нового списання."""
+    
+    if request.method == 'POST':
+        form = WriteOffForm(request.POST)
+        if form.is_valid():
+            writeoff = form.save(commit=False)
+            writeoff.manager = request.user
+            
+            # Списуємо товар зі складу
+            product = writeoff.product
+            product.quantity -= writeoff.quantity
+            product.save(update_fields=['quantity'])
+            
+            writeoff.save()
+            
+            messages.success(
+                request,
+                f'Товар "{product.name}" ({writeoff.quantity} шт.) успішно списано. '
+                f'Збитки: {writeoff.get_total_loss():.2f} грн'
+            )
+            return redirect('writeoffs_list')
+    else:
+        form = WriteOffForm()
+    
+    return render(request, 'store/writeoff_create.html', {
+        'form': form
+    })
+
+
+@login_required
+@role_required(ROLE_MANAGER)
+def expired_products(request):
+    """Список товарів з терміном, що закінчується або закінчився."""
+    
+    today = timezone.localdate()
+    warning_days = 7  # За скільки днів попереджати
+    
+    # Прострочені товари
+    expired = Product.objects.filter(
+        expiry_date__lt=today,
+        quantity__gt=0
+    ).select_related('category', 'supplier').order_by('expiry_date')
+    
+    # Товари, термін яких скоро закінчиться
+    expiring_soon = Product.objects.filter(
+        expiry_date__gte=today,
+        expiry_date__lte=today + timedelta(days=warning_days),
+        quantity__gt=0
+    ).select_related('category', 'supplier').order_by('expiry_date')
+    
+    # Підрахунок потенційних збитків
+    expired_loss = expired.aggregate(
+        total=Sum(F('quantity') * F('purchase_price'), output_field=DecimalField())
+    )['total'] or Decimal('0')
+    
+    expiring_loss = expiring_soon.aggregate(
+        total=Sum(F('quantity') * F('purchase_price'), output_field=DecimalField())
+    )['total'] or Decimal('0')
+    
+    return render(request, 'store/expired_products.html', {
+        'expired': expired,
+        'expiring_soon': expiring_soon,
+        'expired_loss': expired_loss,
+        'expiring_loss': expiring_loss,
+        'warning_days': warning_days,
     })
 
 

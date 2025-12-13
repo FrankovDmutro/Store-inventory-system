@@ -80,6 +80,14 @@ class Product(models.Model):
         default=0,
         verbose_name="Кількість на складі"
     )
+    
+    # Термін придатності
+    expiry_date = models.DateField(
+        blank=True,
+        null=True,
+        verbose_name="Термін придатності"
+    )
+    
     image = models.ImageField(upload_to='products/', blank=True, null=True, verbose_name="Фото товару")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата додавання")
 
@@ -206,3 +214,77 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return f"{self.product.name} x {self.quantity}"
+
+    class Meta:
+        verbose_name = "Позиція чека"
+        verbose_name_plural = "Позиції чека"
+
+
+# 3. СПИСАННЯ ТОВАРІВ
+class WriteOff(models.Model):
+    """Модель для списання товарів (бій, брак, термін придатності)"""
+    
+    class Reason(models.TextChoices):
+        DAMAGE = 'damage', 'Бій/Пошкодження'
+        DEFECT = 'defect', 'Брак'
+        EXPIRY = 'expiry', 'Термін придатності'
+        OTHER = 'other', 'Інше'
+    
+    product = models.ForeignKey(
+        Product, 
+        on_delete=models.PROTECT, 
+        related_name='writeoffs',
+        verbose_name="Товар"
+    )
+    quantity = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
+        verbose_name="Кількість"
+    )
+    reason = models.CharField(
+        max_length=20,
+        choices=Reason.choices,
+        default=Reason.OTHER,
+        verbose_name="Причина списання"
+    )
+    comment = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Коментар"
+    )
+    manager = models.ForeignKey(
+        'auth.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name="Менеджер"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Дата списання"
+    )
+    
+    # Зберігаємо собівартість на момент списання для статистики
+    purchase_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name="Собівартість на момент списання"
+    )
+    
+    def get_total_loss(self):
+        """Загальна сума збитків від списання"""
+        if self.quantity is None or self.purchase_price is None:
+            return 0
+        return self.quantity * self.purchase_price
+    
+    def save(self, *args, **kwargs):
+        # Зберігаємо собівартість при створенні
+        if not self.pk and not self.purchase_price:
+            self.purchase_price = self.product.purchase_price
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"Списання: {self.product.name} x {self.quantity} ({self.get_reason_display()})"
+    
+    class Meta:
+        verbose_name = "Списання"
+        verbose_name_plural = "Списання"
+        ordering = ['-created_at']
