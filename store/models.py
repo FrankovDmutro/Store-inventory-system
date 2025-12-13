@@ -50,7 +50,7 @@ class Product(models.Model):
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, blank=True, null=True, related_name='products', verbose_name="Постачальник")
     
     # --- НОВЕ ПОЛЕ: АРТИКУЛ ---
-    sku = models.CharField(max_length=20, verbose_name="Артикул/Код", blank=True, null=True)
+    sku = models.CharField(max_length=20, verbose_name="Артикул/Код", blank=True, null=True, db_index=True)
     
     name = models.CharField(max_length=200, verbose_name="Назва товару")
     
@@ -183,7 +183,7 @@ class PurchaseItem(models.Model):
 
 # 1. ГОЛОВНИЙ ЧЕК (Шапка)
 class Order(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата створення", db_index=True)
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Загальна сума")
     total_profit = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Загальний прибуток")
 
