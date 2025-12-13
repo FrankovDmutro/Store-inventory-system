@@ -23,13 +23,7 @@
             </form>
         </div>
     </div>
-    <div class="mb-4">
-        <div class="btn-group" role="group">
-            <a href="{% url 'manager_dashboard' %}" class="btn btn-outline-secondary active">Панель</a>
-            <a href="{% url 'manager_receipts_list' %}" class="btn btn-outline-secondary">Всі чеки</a>
-            <a href="{% url 'manager_products_list' %}" class="btn btn-outline-secondary">Всі товари</a>
-        </div>
-    </div>
+    {% include 'store/partials/manager_nav.html' %}
 
     <div class="row g-3 mb-4">
         <div class="col-md-6">

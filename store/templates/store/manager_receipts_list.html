@@ -3,20 +3,14 @@
 {% block title %}Всі чеки{% endblock %}
 {% block content %}
 <div class="container mt-3">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0">Список чеків</h3>
-    <div class="d-flex gap-2">
-      <div class="btn-group" role="group">
-        <a href="{% url 'manager_dashboard' %}" class="btn btn-outline-secondary">Панель</a>
-        <a href="{% url 'manager_receipts_list' %}" class="btn btn-outline-secondary active">Всі чеки</a>
-        <a href="{% url 'manager_products_list' %}" class="btn btn-outline-secondary">Всі товари</a>
-      </div>
-      <form class="d-flex" method="get">
+  <div class="mb-2">
+    <h3 class="mb-2">Список чеків</h3>
+    {% include 'store/partials/manager_nav.html' %}
+    <form class="d-flex" method="get">
         <input type="date" name="date" class="form-control form-control-sm" value="{{ date }}">
         <button class="btn btn-sm btn-primary ms-2" type="submit">Фільтрувати</button>
         <a class="btn btn-sm btn-secondary ms-1" href="?">Скинути</a>
       </form>
-    </div>
   </div>
   <div class="table-responsive">
     <table class="table table-striped">

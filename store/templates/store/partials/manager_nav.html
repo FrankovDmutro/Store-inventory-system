@@ -1,0 +1,9 @@
+<div class="mb-3 d-flex justify-content-start">
+  {% with url_name=request.resolver_match.url_name %}
+  <div class="btn-group" role="group">
+    <a href="{% url 'manager_dashboard' %}" class="btn btn-outline-secondary {% if url_name == 'manager_dashboard' %}active{% endif %}">Панель</a>
+    <a href="{% url 'manager_receipts_list' %}" class="btn btn-outline-secondary {% if url_name == 'manager_receipts_list' %}active{% endif %}">Всі чеки</a>
+    <a href="{% url 'manager_products_list' %}" class="btn btn-outline-secondary {% if url_name == 'manager_products_list' %}active{% endif %}">Всі товари</a>
+  </div>
+  {% endwith %}
+</div>

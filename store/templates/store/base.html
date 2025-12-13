@@ -37,7 +37,10 @@
             <a class="navbar-brand" href="{% url 'root' %}">📦 SIS - POS</a>
             <div class="d-flex align-items-center">
                 <span class="text-white me-3">👤 {{ user.username }}</span>
-                <a href="{% url 'logout' %}" class="btn btn-sm btn-logout">Вихід</a>
+                <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-logout">Вихід</button>
+                </form>
             </div>
         </div>
     </nav>
