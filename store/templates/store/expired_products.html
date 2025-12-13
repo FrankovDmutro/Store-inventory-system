@@ -30,11 +30,11 @@
             </div>
         </div>
         <div class="col-md-6">
-            <div class="card text-white bg-warning">
+            <div class="card text-white" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
                 <div class="card-body">
-                    <h6 class="card-title text-dark">⏰ Термін закінчується ({{ warning_days }} днів)</h6>
-                    <h3 class="text-dark">{{ expiring_soon.count }} товарів</h3>
-                    <p class="mb-0 text-dark">Потенційні збитки: <strong>{{ expiring_loss|floatformat:2 }} грн</strong></p>
+                    <h6 class="card-title">⏰ Термін закінчується ({{ warning_days }} днів)</h6>
+                    <h3>{{ expiring_soon.count }} товарів</h3>
+                    <p class="mb-0">Потенційні збитки: <strong>{{ expiring_loss|floatformat:2 }} грн</strong></p>
                 </div>
             </div>
         </div>

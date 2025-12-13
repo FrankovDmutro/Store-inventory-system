@@ -40,10 +40,24 @@ class PurchaseService:
         
         # Групуємо товари по постачальниках
         supplier_groups = {}
+        skipped_items = []
         for item in items_data:
             try:
                 product = Product.objects.select_related('supplier').get(id=item['product_id'])
                 supplier_id = product.supplier_id
+
+                # Пропускаємо товари без призначеного постачальника, щоб уникнути помилки NULL
+                if supplier_id is None:
+                    skipped_items.append(product.name)
+                    continue
+
+                # Валідації кількості та ціни
+                quantity = int(item['quantity'])
+                unit_cost = item.get('unit_cost')
+                unit_cost_decimal = Decimal(str(unit_cost if unit_cost is not None else product.purchase_price))
+                if quantity <= 0:
+                    skipped_items.append(product.name)
+                    continue
                 
                 if supplier_id not in supplier_groups:
                     supplier_groups[supplier_id] = {
@@ -53,10 +67,11 @@ class PurchaseService:
                 
                 supplier_groups[supplier_id]['items'].append({
                     'product': product,
-                    'quantity': int(item['quantity']),
-                    'unit_cost': Decimal(str(item['unit_cost']))
+                    'quantity': quantity,
+                    'unit_cost': unit_cost_decimal
                 })
-            except (Product.DoesNotExist, KeyError, ValueError):
+            except (Product.DoesNotExist, KeyError, ValueError, Decimal.InvalidOperation):
+                # Якщо продукт відсутній або дані некоректні, пропускаємо
                 continue
         
         # Створюємо поставки для кожного постачальника
@@ -101,6 +116,16 @@ class PurchaseService:
                 'supplier': supplier.name,
                 'items': len(items),
                 'total': float(total_cost)
+            })
+        
+        # Якщо були пропущені товари, додаємо службовий запис для відображення у повідомленні
+        if skipped_items:
+            created_purchases.append({
+                'id': None,
+                'supplier': 'Пропущені товари',
+                'items': len(skipped_items),
+                'total': 0.0,
+                'skipped': skipped_items
             })
         
         return created_purchases

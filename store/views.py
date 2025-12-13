@@ -524,19 +524,36 @@ def create_purchase(request):
                 messages.error(request, 'Не вдалося обробити жодну позицію')
             elif len(created_purchases) == 1:
                 p = created_purchases[0]
-                messages.success(
-                    request,
-                    f'Створено поставку ID: {p["id"]}, '
-                    f'постачальник: {p["supplier"]}, '
-                    f'позицій: {p["items"]}, сума: {p["total"]} ₴'
-                )
+                if p.get('id'):
+                    messages.success(
+                        request,
+                        f'Створено поставку ID: {p["id"]}, '
+                        f'постачальник: {p["supplier"]}, '
+                        f'позицій: {p["items"]}, сума: {p["total"]} грн'
+                    )
+                else:
+                    # Є лише службовий запис про пропущені товари
+                    messages.warning(
+                        request,
+                        'Пропущені товари без постачальника: ' + ', '.join(p.get('skipped', []))
+                    )
             else:
-                details = [f'{p["supplier"]} (ID: {p["id"]}, {p["items"]} поз., {p["total"]} ₴)' 
-                          for p in created_purchases]
-                messages.success(
-                    request,
-                    f'Створено {len(created_purchases)} поставок: ' + '; '.join(details)
-                )
+                # Відокремлюємо службовий запис (пропущені товари), якщо він є
+                skipped_entry = next((x for x in created_purchases if x.get('id') is None and x.get('skipped')), None)
+                purchases_only = [p for p in created_purchases if p.get('id')]
+
+                if purchases_only:
+                    details = [f'{p["supplier"]} (ID: {p["id"]}, {p["items"]} поз., {p["total"]} грн)'
+                              for p in purchases_only]
+                    messages.success(
+                        request,
+                        f'Створено {len(purchases_only)} поставок: ' + '; '.join(details)
+                    )
+                if skipped_entry:
+                    messages.warning(
+                        request,
+                        'Пропущені товари без постачальника: ' + ', '.join(skipped_entry.get('skipped', []))
+                    )
         except Exception as e:
             logger.error(f"Purchase creation error: {e}")
             messages.error(request, f'Помилка створення поставки: {str(e)}')
