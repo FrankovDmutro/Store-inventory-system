@@ -81,7 +81,10 @@
         </div>
         <div class="col-lg-6">
             <div class="card">
-                <div class="card-header">🧾 Останні чеки</div>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>🧾 Останні чеки</span>
+                    <a href="{% url 'manager_receipts_list' %}" class="btn btn-sm btn-outline-primary">Всі чеки</a>
+                </div>
                 <div class="card-body p-0">
                     {% if latest_orders %}
                     <table class="table mb-0 align-middle">
@@ -111,6 +114,21 @@
             </div>
         </div>
     </div>
+
+    <div class="card mt-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>🚚 Поставки</span>
+            <a href="{% url 'suppliers_list' %}" class="btn btn-sm btn-primary">
+                ➜ Управління поставками
+            </a>
+        </div>
+        <div class="card-body text-center text-muted">
+            <p class="mb-2">Для формування поставок перейдіть у розділ "Поставки"</p>
+            <a href="{% url 'suppliers_list' %}" class="btn btn-lg btn-success">
+                Створити нову поставку
+            </a>
+        </div>
+    </div>
 </div>
-</body>
-</html>
+</head>
+<body>

@@ -5,9 +5,11 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q, F, Sum
 from django.db import transaction
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from decimal import Decimal, InvalidOperation
+import json
 import logging
-from .models import Product, Category, Order, OrderItem
+from .models import Product, Category, Order, OrderItem, Supplier, Purchase, PurchaseItem
 from .utils import role_required, ROLE_CASHIER, ROLE_MANAGER
 
 logger = logging.getLogger(__name__)
@@ -270,6 +272,82 @@ def manager_dashboard(request):
 
 @login_required
 @role_required(ROLE_MANAGER)
+@transaction.atomic
+def create_purchase_draft(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Метод не дозволений'}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({'status': 'error', 'message': 'Невірний формат даних'}, status=400)
+
+    supplier_id = payload.get('supplier_id')
+    items = payload.get('items', []) or []
+    expected_raw = payload.get('expected_date')
+
+    if not supplier_id:
+        return JsonResponse({'status': 'error', 'message': 'Оберіть постачальника'}, status=400)
+    if not items:
+        return JsonResponse({'status': 'error', 'message': 'Додайте товари до поставки'}, status=400)
+
+    supplier = get_object_or_404(Supplier, id=supplier_id)
+
+    expected_date = None
+    if expected_raw:
+        parsed = parse_datetime(expected_raw)
+        if parsed:
+            if timezone.is_naive(parsed):
+                parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+            expected_date = parsed
+
+    purchase = Purchase.objects.create(
+        supplier=supplier,
+        status='draft',
+        expected_date=expected_date,
+    )
+
+    total = Decimal('0')
+    created_count = 0
+
+    for item in items:
+        pid = item.get('product_id')
+        qty_raw = item.get('quantity')
+        cost_raw = item.get('unit_cost')
+
+        if not pid or qty_raw is None:
+            continue
+
+        try:
+            product = Product.objects.get(id=int(pid))
+            qty = Decimal(str(qty_raw))
+            if qty <= 0:
+                continue
+            unit_cost = Decimal(str(cost_raw if cost_raw is not None else product.purchase_price))
+        except (Product.DoesNotExist, InvalidOperation, ValueError):
+            continue
+
+        PurchaseItem.objects.create(
+            purchase=purchase,
+            product=product,
+            quantity=qty,
+            unit_cost=unit_cost,
+        )
+        created_count += 1
+        total += qty * unit_cost
+
+    if created_count == 0:
+        purchase.delete()
+        return JsonResponse({'status': 'error', 'message': 'Не вдалося додати жодну позицію'}, status=400)
+
+    purchase.total_cost = total
+    purchase.save(update_fields=['total_cost'])
+
+    return JsonResponse({'status': 'success', 'purchase_id': purchase.id, 'total_cost': float(total)})
+
+
+@login_required
+@role_required(ROLE_MANAGER)
 def manager_receipts_list(request):
     """Сторінка списку всіх чеків з фільтром за датою та сортуванням."""
     from .models import Order
@@ -363,3 +441,218 @@ def manager_products_list(request):
         'current_sort': sort,
         'current_order': order,
     })
+
+
+@login_required
+@role_required(ROLE_MANAGER)
+def suppliers_list(request):
+    """Сторінка списку постачальників та управління поставками."""
+    suppliers = Supplier.objects.all().order_by('name')
+    products = Product.objects.select_related('category', 'supplier').order_by('name')
+    
+    # Для кожного постачальника лічимо товари з низьким залишком
+    suppliers_data = []
+    for supplier in suppliers:
+        low_count = supplier.products.filter(quantity__lte=5).count()
+        suppliers_data.append({
+            'id': supplier.id,
+            'name': supplier.name,
+            'email': supplier.email,
+            'phone': supplier.phone,
+            'address': supplier.address,
+            'notes': supplier.notes,
+            'products_count': supplier.products.count(),
+            'low_stock_count': low_count,
+        })
+    
+    products_payload = []
+    for p in products:
+        try:
+            products_payload.append({
+                'id': p.id,
+                'name': p.name,
+                'sku': p.sku or '',
+                'stock': float(p.quantity),
+                'purchase_price': float(p.purchase_price),
+                'supplier_id': p.supplier_id,
+                'supplier_name': p.supplier.name if p.supplier else '',
+                'category': p.category.name,
+            })
+        except (ValueError, InvalidOperation):
+            continue
+    
+    return render(request, 'store/suppliers_list.html', {
+        'suppliers': suppliers_data,
+        'products_json': json.dumps(products_payload, ensure_ascii=False),
+    })
+
+
+@login_required
+@role_required(ROLE_MANAGER)
+def create_supplier(request):
+    """Додавання нового постачальника."""
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        email = request.POST.get('email', '').strip()
+        phone = request.POST.get('phone', '').strip()
+        address = request.POST.get('address', '').strip()
+        notes = request.POST.get('notes', '').strip()
+        
+        if not name:
+            messages.error(request, 'Ім\'я постачальника обов\'язкове')
+            return redirect('suppliers_list')
+        
+        # Перевірка унікальності
+        if Supplier.objects.filter(name__iexact=name).exists():
+            messages.error(request, 'Постачальник з такою назвою вже існує')
+            return redirect('suppliers_list')
+        
+        supplier = Supplier.objects.create(
+            name=name,
+            email=email if email else None,
+            phone=phone if phone else None,
+            address=address if address else None,
+            notes=notes if notes else None,
+        )
+        
+        messages.success(request, f'Постачальник "{supplier.name}" успішно додан')
+        return redirect('suppliers_list')
+    
+    return redirect('suppliers_list')
+
+
+@login_required
+@role_required(ROLE_MANAGER)
+@transaction.atomic
+def create_purchase(request):
+    """Формування поставки від постачальника."""
+    if request.method == 'POST':
+        expected_date = request.POST.get('expected_date')
+        items_json = request.POST.get('items_json', '[]')
+        
+        logger.info(f"create_purchase - items_json: {items_json}, expected_date: {expected_date}")
+        
+        try:
+            items = json.loads(items_json)
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.error(f"JSON decode error: {e}")
+            messages.error(request, 'Невірний формат даних товарів')
+            return redirect('suppliers_list')
+        
+        if not items:
+            messages.error(request, 'Додайте товари до поставки')
+            return redirect('suppliers_list')
+        
+        expected_date_obj = None
+        if expected_date:
+            try:
+                expected_date_obj = timezone.datetime.fromisoformat(expected_date)
+                if timezone.is_naive(expected_date_obj):
+                    expected_date_obj = timezone.make_aware(expected_date_obj, timezone.get_current_timezone())
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Date parse error: {e}")
+                pass
+        
+        # Групуємо товари по постачальниках
+        suppliers_items = {}
+        
+        for item in items:
+            pid = item.get('product_id')
+            qty_raw = item.get('quantity')
+            cost_raw = item.get('unit_cost')
+            
+            logger.info(f"Processing item - product_id: {pid}, qty: {qty_raw}, cost: {cost_raw}")
+            
+            if not pid or qty_raw is None:
+                logger.warning(f"Skipping item - missing pid or qty")
+                continue
+            
+            try:
+                product = Product.objects.get(id=int(pid))
+                qty = int(qty_raw)
+                if qty <= 0:
+                    logger.warning(f"Skipping item - qty <= 0")
+                    continue
+                unit_cost = Decimal(str(cost_raw if cost_raw is not None else product.purchase_price))
+                
+                # Визначаємо постачальника товару
+                supplier_id = product.supplier_id if product.supplier else None
+                
+                if supplier_id not in suppliers_items:
+                    suppliers_items[supplier_id] = []
+                
+                suppliers_items[supplier_id].append({
+                    'product': product,
+                    'quantity': qty,
+                    'unit_cost': unit_cost
+                })
+                
+            except (Product.DoesNotExist, InvalidOperation, ValueError) as e:
+                logger.error(f"Error processing product {pid}: {e}")
+                continue
+        
+        if not suppliers_items:
+            messages.error(request, 'Не вдалося обробити жодну позицію')
+            return redirect('suppliers_list')
+        
+        # Створюємо окрему поставку для кожного постачальника
+        created_purchases = []
+        
+        for supplier_id, supplier_items in suppliers_items.items():
+            if supplier_id is None:
+                logger.warning("Skipping items without supplier")
+                continue
+            
+            try:
+                supplier = Supplier.objects.get(id=supplier_id)
+            except Supplier.DoesNotExist:
+                logger.error(f"Supplier {supplier_id} not found")
+                continue
+            
+            purchase = Purchase.objects.create(
+                supplier=supplier,
+                status='draft',
+                expected_date=expected_date_obj,
+            )
+            
+            total = Decimal('0')
+            created_count = 0
+            
+            for item_data in supplier_items:
+                PurchaseItem.objects.create(
+                    purchase=purchase,
+                    product=item_data['product'],
+                    quantity=item_data['quantity'],
+                    unit_cost=item_data['unit_cost'],
+                )
+                created_count += 1
+                total += item_data['quantity'] * item_data['unit_cost']
+            
+            purchase.total_cost = total
+            purchase.save(update_fields=['total_cost'])
+            
+            created_purchases.append({
+                'id': purchase.id,
+                'supplier': supplier.name,
+                'total': total,
+                'items': created_count
+            })
+            
+            logger.info(f"Purchase created - ID: {purchase.id}, supplier: {supplier.name}, total_cost: {total}, items: {created_count}")
+        
+        if not created_purchases:
+            messages.error(request, 'Не вдалося створити жодної поставки')
+            return redirect('suppliers_list')
+        
+        # Формуємо повідомлення про створені поставки
+        if len(created_purchases) == 1:
+            p = created_purchases[0]
+            messages.success(request, f'Поставка від "{p["supplier"]}" успішно створена (ID: {p["id"]}, {p["items"]} позицій, {p["total"]} ₴)')
+        else:
+            msg = f'Створено {len(created_purchases)} поставок: '
+            details = [f'{p["supplier"]} (ID: {p["id"]}, {p["items"]} поз., {p["total"]} ₴)' for p in created_purchases]
+            messages.success(request, msg + '; '.join(details))
+        
+        return redirect('suppliers_list')
+    
+    return redirect('suppliers_list')

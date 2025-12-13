@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Управління постачальниками</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f5f7fb; }
+        .card { border: none; box-shadow: 0 6px 20px rgba(0,0,0,0.05); }
+        .supplier-item { cursor: pointer; transition: all 0.2s ease; }
+        .supplier-item:hover { transform: translateX(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .supplier-item.active { background: #e7f1ff; border-left: 4px solid #0d6efd; }
+        .products-list { max-height: 400px; overflow-y: auto; }
+        .product-checkbox { width: 18px; height: 18px; margin-right: 10px; }
+        .draft-items { max-height: 350px; overflow-y: auto; }
+        .badge-supplier { font-size: 0.85rem; padding: 0.4rem 0.6rem; }
+        input[type="number"] { width: 80px; }
+        /* Прибираємо стрілочки з readonly полів */
+        input[type="number"][readonly] {
+            -moz-appearance: textfield;
+            background-color: #e9ecef;
+            cursor: not-allowed;
+        }
+        input[type="number"][readonly]::-webkit-outer-spin-button,
+        input[type="number"][readonly]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">📦 Управління постачальниками та поставками</h2>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-primary">{{ user.username }}</span>
+            <form method="post" action="{% url 'logout' %}" class="mb-0">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-danger">Вихід</button>
+            </form>
+        </div>
+    </div>
+
+    {% include 'store/partials/manager_nav.html' %}
+
+    {% if messages %}
+        <div class="mb-3">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="row g-4">
+        <!-- ЛІВА КОЛОНА: Список постачальників та додавання -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">📋 Постачальники</h5>
+                    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addSupplierModal">
+                        + Додати
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    {% if suppliers %}
+                        <div class="list-group list-group-flush" id="suppliersList">
+                            {% for supplier in suppliers %}
+                                <div class="list-group-item supplier-item" data-supplier-id="{{ supplier.id }}" data-supplier-name="{{ supplier.name }}">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">{{ supplier.name }}</h6>
+                                            {% if supplier.phone %}
+                                                <small class="text-muted d-block">{{ supplier.phone }}</small>
+                                            {% endif %}
+                                            {% if supplier.email %}
+                                                <small class="text-muted d-block">{{ supplier.email }}</small>
+                                            {% endif %}
+                            <div class="mt-2">
+                                                <span class="badge bg-secondary">{{ supplier.products_count }} товарів</span>
+                                                {% if supplier.low_stock_count > 0 %}
+                                                    <span class="badge bg-danger">
+                                                        ⚠️ {{ supplier.low_stock_count }} закінчується
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="p-3 text-center text-muted">
+                            Немає постачальників. <br>
+                            <button class="btn btn-sm btn-outline-primary mt-2" data-bs-toggle="modal" data-bs-target="#addSupplierModal">
+                                Додати першого
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- ПРАВОРУЧ: Формування поставки та товари постачальника -->
+        <div class="col-lg-8">
+            <!-- Вибір товарів -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📦 Доступні товари</h5>
+                    <small class="text-muted">Виберіть постачальника зліва або додайте будь-які товари</small>
+                </div>
+                <div class="card-body">
+                    <input type="text" id="searchProducts" class="form-control mb-3" placeholder="Пошук товару...">
+                    <div class="products-list" id="productsList">
+                        <p class="text-muted text-center">Виберіть постачальника зліва або використайте пошук</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Черновик поставки -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">📝 Формування поставки</h5>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-warning" id="clearDraftBtn" style="display:none;">Очистити</button>
+                        <button type="submit" form="purchaseForm" class="btn btn-sm btn-success" id="submitPurchaseBtn" style="display:none;">✓ Створити поставку</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form id="purchaseForm" method="post" action="{% url 'create_purchase' %}">
+                        {% csrf_token %}
+                        <input type="hidden" id="items_json" name="items_json" value="[]">
+                        
+                        <div class="mb-3">
+                            <label for="expected_date" class="form-label">Очікувана дата доставки</label>
+                            <input type="datetime-local" id="expected_date" name="expected_date" class="form-control">
+                        </div>
+
+                        <div class="draft-items" id="draftItems">
+                            <p class="text-muted text-center">Товари з'являться тут</p>
+                        </div>
+
+                        <hr>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Загальна вартість:</h6>
+                                <h5 id="totalCost" class="text-success">0.00 ₴</h5>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <h6>Кількість позицій:</h6>
+                                <h5 id="itemsCount" class="text-info">0</h5>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- МОДАЛЬ: Додавання постачальника -->
+<div class="modal fade" id="addSupplierModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'create_supplier' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Додати постачальника</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Назва постачальника *</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email">
+                    </div>
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">Телефон</label>
+                        <input type="tel" class="form-control" id="phone" name="phone">
+                    </div>
+                    <div class="mb-3">
+                        <label for="address" class="form-label">Адреса</label>
+                        <input type="text" class="form-control" id="address" name="address">
+                    </div>
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Нотатки</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                    <button type="submit" class="btn btn-success">Додати постачальника</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Глобальні змінні та функції
+const allProducts = JSON.parse('{{ products_json|escapejs }}');
+let currentSupplierId = null;
+let draftItems = {};
+
+// Завантаження товарів постачальника
+function loadSupplierProducts() {
+    const productsList = document.getElementById('productsList');
+    const supplierId = parseInt(currentSupplierId);
+    
+    const supplierProducts = allProducts.filter(p => 
+        p.supplier_id === supplierId || p.supplier_id === null
+    );
+    
+    if (supplierProducts.length === 0) {
+        productsList.innerHTML = '<p class="text-muted text-center">Немає товарів для цього постачальника</p>';
+        return;
+    }
+    
+    let html = '<div class="list-group list-group-flush">';
+    supplierProducts.forEach(product => {
+        const escapedName = product.name.replace(/'/g, "\\'");
+        html += `
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div class="flex-grow-1">
+                    <h6 class="mb-1">${product.name}</h6>
+                    <small class="text-muted">
+                        SKU: ${product.sku || '-'} | Категорія: ${product.category}
+                    </small>
+                    <div class="mt-1">
+                        <span class="badge bg-info">На складі: ${product.stock} шт</span>
+                        <span class="badge bg-warning text-dark">Ціна закупівлі: ${product.purchase_price.toFixed(2)} ₴</span>
+                    </div>
+                </div>
+                <div class="ms-2">
+                    <button type="button" class="btn btn-sm btn-primary" 
+                            onclick="addProductToDraft(${product.id}, '${escapedName}', ${product.purchase_price})">
+                        +
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    productsList.innerHTML = html;
+}
+
+// Додавання товару до чернетки
+function addProductToDraft(productId, productName, purchasePrice) {
+    const key = `${productId}`;
+    if (!draftItems[key]) {
+        draftItems[key] = {
+            product_id: productId,
+            name: productName,
+            quantity: 1,
+            unit_cost: purchasePrice
+        };
+    } else {
+        draftItems[key].quantity += 1;
+    }
+    updateDraftDisplay();
+}
+
+// Видалення товару з чернетки
+function removeProductFromDraft(productId) {
+    delete draftItems[`${productId}`];
+    updateDraftDisplay();
+}
+
+// Оновлення кількості
+function updateProductQuantity(productId, quantity) {
+    const qty = parseInt(quantity) || 0;
+    if (qty > 0) {
+        draftItems[`${productId}`].quantity = qty;
+        updateDraftDisplay();
+    } else {
+        removeProductFromDraft(productId);
+    }
+}
+
+// Оновлення відображення чернетки
+function updateDraftDisplay() {
+    const draftDiv = document.getElementById('draftItems');
+    const items = Object.values(draftItems);
+    
+    if (items.length === 0) {
+        draftDiv.innerHTML = '<p class="text-muted text-center">Товари з\'являться тут</p>';
+        document.getElementById('submitPurchaseBtn').style.display = 'none';
+        document.getElementById('clearDraftBtn').style.display = 'none';
+        document.getElementById('totalCost').textContent = '0.00 ₴';
+        document.getElementById('itemsCount').textContent = '0';
+        document.getElementById('items_json').value = '[]';
+        return;
+    }
+    
+    // Групуємо товари по постачальниках
+    let uniqueSuppliers = new Set();
+    items.forEach(item => {
+        const product = allProducts.find(p => p.id === item.product_id);
+        if (product && product.supplier_name) {
+            uniqueSuppliers.add(product.supplier_name);
+        }
+    });
+    
+    let total = 0;
+    let html = '';
+    
+    // Показуємо інформацію про постачальників
+    if (uniqueSuppliers.size > 1) {
+        html += `<div class="alert alert-info mb-2 py-2 px-3">
+            <small><strong>📦 Буде створено ${uniqueSuppliers.size} поставки:</strong> ${Array.from(uniqueSuppliers).join(', ')}</small>
+        </div>`;
+    } else if (uniqueSuppliers.size === 1) {
+        html += `<div class="alert alert-success mb-2 py-2 px-3">
+            <small><strong>📦 Постачальник:</strong> ${Array.from(uniqueSuppliers)[0]}</small>
+        </div>`;
+    }
+    
+    html += '<table class="table table-sm mb-0">';
+    html += '<thead><tr>';
+    html += '<th style="width: 30%;">Товар / Постачальник</th>';
+    html += '<th style="width: 15%;" class="text-center">Кількість</th>';
+    html += '<th style="width: 20%;" class="text-end">Ціна за од.</th>';
+    html += '<th style="width: 20%;" class="text-end">Разом</th>';
+    html += '<th style="width: 15%;"></th>';
+    html += '</tr></thead><tbody>';
+    
+    items.forEach(item => {
+        const itemTotal = item.quantity * item.unit_cost;
+        total += itemTotal;
+        
+        const product = allProducts.find(p => p.id === item.product_id);
+        const supplierBadge = product && product.supplier_name ? 
+            `<small class="text-muted d-block">${product.supplier_name}</small>` : '';
+        
+        html += `
+            <tr>
+                <td class="align-middle">
+                    <strong>${item.name}</strong>
+                    ${supplierBadge}
+                </td>
+                <td class="align-middle text-center">
+                    <input type="number" class="form-control form-control-sm d-inline-block" style="width: 70px;"
+                           value="${item.quantity}" step="1" min="1"
+                           onchange="updateProductQuantity(${item.product_id}, this.value)">
+                </td>
+                <td class="align-middle text-end">
+                    <span class="text-muted">${item.unit_cost.toFixed(2)} ₴</span>
+                </td>
+                <td class="align-middle text-end">
+                    <strong>${itemTotal.toFixed(2)} ₴</strong>
+                </td>
+                <td class="align-middle text-end">
+                    <button type="button" class="btn btn-sm btn-danger" 
+                            onclick="removeProductFromDraft(${item.product_id})">
+                        ✕
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table>';
+    draftDiv.innerHTML = html;
+    
+    document.getElementById('itemsCount').textContent = items.length;
+    document.getElementById('totalCost').textContent = total.toFixed(2) + ' ₴';
+    
+    // Формуємо масив для надсилання
+    const itemsToSend = items.map(item => ({
+        product_id: item.product_id,
+        quantity: parseInt(item.quantity),
+        unit_cost: parseFloat(item.unit_cost)
+    }));
+    document.getElementById('items_json').value = JSON.stringify(itemsToSend);
+    
+    document.getElementById('submitPurchaseBtn').style.display = 'inline-block';
+    document.getElementById('clearDraftBtn').style.display = 'inline-block';
+}
+
+// Ініціалізація після завантаження DOM
+document.addEventListener('DOMContentLoaded', function() {
+    // Клік на постачальника
+    document.querySelectorAll('.supplier-item').forEach(el => {
+        el.addEventListener('click', function() {
+            console.log('Клік на постачальника:', this.dataset.supplierId);
+            document.querySelectorAll('.supplier-item').forEach(e => e.classList.remove('active'));
+            this.classList.add('active');
+            
+            currentSupplierId = parseInt(this.dataset.supplierId);
+            loadSupplierProducts();
+        });
+    });
+    
+    // Очищення чернетки
+    document.getElementById('clearDraftBtn').addEventListener('click', function() {
+        if (confirm('Очистити всі товари з чернетки?')) {
+            draftItems = {};
+            updateDraftDisplay();
+        }
+    });
+    
+    // Відправка форми
+    document.getElementById('purchaseForm').addEventListener('submit', function(e) {
+        const items = Object.values(draftItems);
+        if (items.length === 0) {
+            e.preventDefault();
+            alert('Додайте товари до поставки');
+            return false;
+        }
+    });
+    
+    // Пошук товарів
+    document.getElementById('searchProducts').addEventListener('input', function(e) {
+        const query = e.target.value.toLowerCase();
+        const productsList = document.getElementById('productsList');
+        const items = productsList.querySelectorAll('.list-group-item');
+        
+        items.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            item.style.display = text.includes(query) ? '' : 'none';
+        });
+    });
+});
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

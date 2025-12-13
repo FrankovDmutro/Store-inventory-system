@@ -75,12 +75,9 @@ class Product(models.Model):
         verbose_name="Ціна продажу (грн)"
     )
     
-    # Змінено на DecimalField для підтримки дробових значень (напр. 0.5 кг)
-    quantity = models.DecimalField(
-        max_digits=10, 
-        decimal_places=3, 
+    # Кількість на складі - тільки цілі числа
+    quantity = models.PositiveIntegerField(
         default=0,
-        validators=[MinValueValidator(Decimal('0'))],
         verbose_name="Кількість на складі"
     )
     image = models.ImageField(upload_to='products/', blank=True, null=True, verbose_name="Фото товару")
@@ -156,7 +153,7 @@ class Purchase(models.Model):
 class PurchaseItem(models.Model):
     purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name='items', verbose_name="Поставка")
     product = models.ForeignKey(Product, on_delete=models.PROTECT, verbose_name="Товар")
-    quantity = models.DecimalField(max_digits=10, decimal_places=3, validators=[MinValueValidator(Decimal('0.001'))], verbose_name="Кількість")
+    quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)], verbose_name="Кількість")
     unit_cost = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))], verbose_name="Ціна за од.")
 
     def line_total(self):
@@ -194,7 +191,7 @@ class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name='items', on_delete=models.CASCADE, verbose_name="Чек")
     product = models.ForeignKey(Product, on_delete=models.PROTECT, verbose_name="Товар")
     
-    quantity = models.DecimalField(max_digits=10, decimal_places=3, verbose_name="Кількість")
+    quantity = models.PositiveIntegerField(verbose_name="Кількість")
     price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Ціна продажу (за од.)")
     
     # Зберігаємо собівартість на момент продажу (щоб якщо ціна зміниться, історія не поламалася)
