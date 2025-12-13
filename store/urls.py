@@ -29,6 +29,11 @@ urlpatterns = [
     path('api/search/', views.search_products, name='search_products'),
     path('api/purchases/draft/', views.create_purchase_draft, name='create_purchase_draft'),
     
+    # API для графіків статистики
+    path('api/charts/sales/', views.api_sales_chart_data, name='api_sales_chart_data'),
+    path('api/charts/categories/', views.api_category_chart_data, name='api_category_chart_data'),
+    path('api/charts/profit/', views.api_profit_chart_data, name='api_profit_chart_data'),
+    
     # Постачальники та поставки
     path('supplier/create/', views.create_supplier, name='create_supplier'),
     path('purchase/create/', views.create_purchase, name='create_purchase'),

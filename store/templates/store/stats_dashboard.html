@@ -229,11 +229,213 @@
     </div>
     {% endif %}
 
+    <!-- ГРАФІКИ -->
+    <div class="row g-3 mb-4">
+        <div class="col-lg-8">
+            <div class="card stat-card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📈 Динаміка продажів за останні 30 днів</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="salesChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card stat-card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">🥧 Структура продажів</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="categoryChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card stat-card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">💰 Динаміка прибутку за останні 30 днів</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="profitChart" style="max-height: 250px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="text-center text-muted small mt-4 pb-4">
         Остання оновлення: {{ today }}
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Конфігурація кольорів
+    const colors = {
+        primary: 'rgba(13, 110, 253, 0.8)',
+        primaryLight: 'rgba(13, 110, 253, 0.1)',
+        success: 'rgba(25, 135, 84, 0.8)',
+        successLight: 'rgba(25, 135, 84, 0.1)',
+        info: 'rgba(13, 202, 240, 0.8)',
+        warning: 'rgba(255, 193, 7, 0.8)',
+        danger: 'rgba(220, 53, 69, 0.8)',
+        purple: 'rgba(111, 66, 193, 0.8)',
+        orange: 'rgba(253, 126, 20, 0.8)'
+    };
+
+    // 1. Графік продажів за 30 днів (лінійний)
+    fetch('{% url "api_sales_chart_data" %}')
+        .then(response => response.json())
+        .then(data => {
+            const ctx = document.getElementById('salesChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Виручка (грн)',
+                        data: data.data,
+                        borderColor: colors.primary,
+                        backgroundColor: colors.primaryLight,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 3,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' грн';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString() + ' грн';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        });
+
+    // 2. Кругова діаграма категорій
+    fetch('{% url "api_category_chart_data" %}')
+        .then(response => response.json())
+        .then(data => {
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        data: data.data,
+                        backgroundColor: [
+                            colors.primary,
+                            colors.success,
+                            colors.warning,
+                            colors.danger,
+                            colors.purple
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return label + ': ' + value.toFixed(2) + ' грн (' + percentage + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        });
+
+    // 3. Графік прибутку за 30 днів
+    fetch('{% url "api_profit_chart_data" %}')
+        .then(response => response.json())
+        .then(data => {
+            const ctx = document.getElementById('profitChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Прибуток (грн)',
+                        data: data.data,
+                        backgroundColor: colors.success,
+                        borderColor: colors.success,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' грн';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString() + ' грн';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        });
+});
+</script>
 </body>
 </html>

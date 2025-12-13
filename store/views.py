@@ -984,3 +984,90 @@ def process_return(request, order_id):
         logger.error(f"Error in process_return: {e}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
+
+# === API ДЛЯ ГРАФІКІВ СТАТИСТИКИ ===
+
+@login_required
+@role_required(ROLE_MANAGER)
+def api_sales_chart_data(request):
+    """API для отримання даних продажів за останні 30 днів"""
+    from datetime import timedelta
+    
+    today = timezone.localdate()
+    days_ago_30 = today - timedelta(days=29)
+    
+    # Отримуємо продажі по днях за останні 30 днів
+    daily_sales = []
+    labels = []
+    
+    for i in range(30):
+        current_date = days_ago_30 + timedelta(days=i)
+        day_sales = Order.objects.filter(
+            created_at__date=current_date
+        ).aggregate(
+            total=Sum('total_price')
+        )['total'] or 0
+        
+        daily_sales.append(float(day_sales))
+        labels.append(current_date.strftime('%d.%m'))
+    
+    return JsonResponse({
+        'labels': labels,
+        'data': daily_sales
+    })
+
+
+@login_required
+@role_required(ROLE_MANAGER)
+def api_category_chart_data(request):
+    """API для отримання структури продажів за категоріями"""
+    
+    # Топ-5 категорій за виручкою
+    category_sales = OrderItem.objects.values(
+        'product__category__name'
+    ).annotate(
+        total=Sum(F('quantity') * F('price'), output_field=DecimalField())
+    ).order_by('-total')[:5]
+    
+    labels = []
+    data = []
+    
+    for item in category_sales:
+        category_name = item['product__category__name'] or 'Без категорії'
+        labels.append(category_name)
+        data.append(float(item['total']))
+    
+    return JsonResponse({
+        'labels': labels,
+        'data': data
+    })
+
+
+@login_required
+@role_required(ROLE_MANAGER)
+def api_profit_chart_data(request):
+    """API для отримання даних прибутку за останні 30 днів"""
+    from datetime import timedelta
+    
+    today = timezone.localdate()
+    days_ago_30 = today - timedelta(days=29)
+    
+    daily_profit = []
+    labels = []
+    
+    for i in range(30):
+        current_date = days_ago_30 + timedelta(days=i)
+        day_profit = Order.objects.filter(
+            created_at__date=current_date
+        ).aggregate(
+            total=Sum('total_profit')
+        )['total'] or 0
+        
+        daily_profit.append(float(day_profit))
+        labels.append(current_date.strftime('%d.%m'))
+    
+    return JsonResponse({
+        'labels': labels,
+        'data': daily_profit
+    })
+
