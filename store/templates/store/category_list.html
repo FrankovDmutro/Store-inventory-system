@@ -1,46 +1,62 @@
-<!DOCTYPE html>
-<html lang="uk">
-<head>
-    <meta charset="UTF-8">
-    <title>Категорії | Каса</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body { min-height: 100vh; background-color: #f4f6f8; display: flex; flex-direction: column; }
-        .pos-header { height: 60px; background: white; border-bottom: 1px solid #ddd; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-        .hover-shadow:hover { transform: translateY(-3px); transition: 0.3s; box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; }
-    </style>
-</head>
-<body>
+{% extends 'store/base.html' %}
+{% block title %}Категорії | SIS{% endblock %}
 
-{% csrf_token %}
-
-<div class="pos-header">
-    <div style="width: 200px;">
-        <a href="{% url 'receipts_list_cashier' %}" class="btn btn-sm btn-outline-primary">
-            <i class="fas fa-receipt"></i> Чеки
+{% block content %}
+<div class="page-header">
+    <div>
+        <p class="page-subtitle text-uppercase mb-1">POS</p>
+        <h2 class="page-title">Оберіть категорію</h2>
+        <p class="page-subtitle">Швидкий перехід до продажів за потрібною групою товарів.</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <a href="{% url 'receipts_list_cashier' %}" class="btn btn-outline-primary">
+            <i class="fas fa-receipt me-1"></i>Історія чеків
         </a>
-    </div>
-    <div style="flex: 1; text-align: center;">
-        <h5 class="mb-0 fw-bold text-primary">📂 Виберіть категорію</h5>
-    </div>
-    <div style="width: 200px; text-align: right;">
-        <span class="fw-bold me-2">{{ user.username }}</span>
-        <form action="{% url 'logout' %}" method="post" style="display:inline;">{% csrf_token %}
-            <button class="btn btn-sm btn-danger">🚪</button>
-        </form>
     </div>
 </div>
 
 {% if request.GET.success %}
-<div class="alert alert-success alert-dismissible fade show m-3" role="alert" id="successAlert" style="font-size: 1.1rem;">
-    <h4 class="alert-heading">✅ Оплата успішно завершена!</h4>
-    <hr>
-    <p class="mb-0">Дякуємо за покупку! 😊</p>
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    <div class="alert alert-success alert-dismissible fade show" role="alert" id="successAlert">
+        <h5 class="mb-1">Чек сформовано</h5>
+        <p class="mb-0">Клієнт отримав чек, ви готові продовжувати продажі.</p>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+{% endif %}
+
+<div class="row g-3">
+    {% for category in categories %}
+    <div class="col-sm-6 col-lg-4">
+        <a href="{% url 'category_detail' category.id %}" class="card card-hover h-100 text-center text-decoration-none text-dark">
+            {% if category.image %}
+                <div class="ratio ratio-4x3">
+                    <img src="{{ category.image.url }}" alt="{{ category.name }}" class="w-100 h-100" style="object-fit: cover; border-top-left-radius: 0.9rem; border-top-right-radius: 0.9rem;">
+                </div>
+            {% else %}
+                <div class="ratio ratio-4x3 d-flex align-items-center justify-content-center bg-light" style="border-top-left-radius: 0.9rem; border-top-right-radius: 0.9rem;">
+                    <i class="fas fa-layer-group text-primary fa-2x"></i>
+                </div>
+            {% endif %}
+            <div class="card-body">
+                <h5 class="card-title fw-bold mb-1">{{ category.name }}</h5>
+                <span class="badge badge-soft">Відкрити</span>
+            </div>
+        </a>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="card card-hover text-center p-4">
+            <h4 class="mb-2">Категорій ще немає</h4>
+            <p class="text-muted mb-3">Додайте категорії в адмін-панелі, щоб розпочати продажі.</p>
+            <a href="/admin/" class="btn btn-dark">Відкрити admin</a>
+        </div>
+    </div>
+    {% endfor %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if request.GET.success %}
 <script>
-    // Автоматично закриваємо повідомлення через 5 секунд
     setTimeout(function() {
         const alert = document.getElementById('successAlert');
         if (alert) {
@@ -50,41 +66,4 @@
     }, 5000);
 </script>
 {% endif %}
-
-<div class="container mt-5">
-
-    <div class="row">
-        {% for category in categories %}
-        <div class="col-md-4 mb-4">
-            <a href="{% url 'category_detail' category.id %}" class="text-decoration-none">
-                <div class="card shadow-sm h-100 text-center hover-shadow border-0">
-                    <div class="card-body d-flex flex-column justify-content-center align-items-center p-0" style="height: 200px; overflow: hidden; position: relative;">
-                        {% if category.image %}
-                            <img src="{{ category.image.url }}" alt="{{ category.name }}" class="w-100 h-100" style="object-fit: cover; opacity: 0.8;">
-                            <div class="position-absolute w-100 h-100 d-flex align-items-center justify-content-center" style="background: rgba(0,0,0,0.3);">
-                                <h3 class="card-title text-white fw-bold text-uppercase" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">{{ category.name }}</h3>
-                            </div>
-                        {% else %}
-                            <div class="display-1 mb-3 text-primary">📁</div>
-                            <h3 class="card-title text-dark fw-bold">{{ category.name }}</h3>
-                        {% endif %}
-                    </div>
-                </div>
-            </a>
-        </div>
-        {% empty %}
-        <div class="col-12 text-center">
-            <div class="alert alert-warning">
-                <h3>Категорій немає 🤷‍♂️</h3>
-                <p>Зайдіть в адмінку і створіть хоча б одну категорію (напр. "Напої").</p>
-                <a href="/admin/" class="btn btn-dark">В адмінку</a>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-</body>
-</html>
+{% endblock %}

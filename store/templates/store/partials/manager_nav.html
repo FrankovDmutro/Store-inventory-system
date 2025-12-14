@@ -1,20 +1,20 @@
 <div class="mb-4">
   {% with url_name=request.resolver_match.url_name %}
-  <div class="btn-group shadow-sm" role="group">
+  <div class="btn-group shadow-sm flex-wrap" role="group">
     <a href="{% url 'manager_dashboard' %}" class="btn btn-{% if url_name == 'manager_dashboard' %}primary{% else %}outline-primary{% endif %}">
-      <i class="fas fa-home me-1"></i>Панель
+      <i class="fas fa-home me-1"></i>Дашборд
     </a>
     <a href="{% url 'stats_dashboard' %}" class="btn btn-{% if url_name == 'stats_dashboard' %}info{% else %}outline-info{% endif %}">
-      <i class="fas fa-chart-line me-1"></i>Статистика
+      <i class="fas fa-chart-line me-1"></i>Аналітика
     </a>
     <a href="{% url 'manager_receipts_list' %}" class="btn btn-{% if url_name == 'manager_receipts_list' %}success{% else %}outline-success{% endif %}">
-      <i class="fas fa-receipt me-1"></i>Всі чеки
+      <i class="fas fa-receipt me-1"></i>Чеки
     </a>
     <a href="{% url 'manager_products_list' %}" class="btn btn-{% if url_name == 'manager_products_list' %}secondary{% else %}outline-secondary{% endif %}">
-      <i class="fas fa-box me-1"></i>Всі товари
+      <i class="fas fa-box me-1"></i>Товари
     </a>
     <a href="{% url 'suppliers_list' %}" class="btn btn-{% if url_name == 'suppliers_list' %}dark{% else %}outline-dark{% endif %}">
-      <i class="fas fa-truck me-1"></i>Поставки
+      <i class="fas fa-truck me-1"></i>Постачальники
     </a>
     <a href="{% url 'writeoffs_list' %}" class="btn btn-{% if url_name == 'writeoffs_list' or url_name == 'writeoff_create' or url_name == 'expired_products' %}danger{% else %}outline-danger{% endif %}">
       <i class="fas fa-trash-alt me-1"></i>Списання

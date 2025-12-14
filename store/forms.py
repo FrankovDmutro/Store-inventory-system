@@ -12,18 +12,20 @@ class SupplierForm(forms.ModelForm):
     
     class Meta:
         model = Supplier
-        fields = ['name', 'email', 'phone', 'address']
+        fields = ['name', 'email', 'phone', 'address', 'notes']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Назва постачальника'}),
             'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'email@example.com'}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+380XXXXXXXXX'}),
-            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Адреса'})
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Адреса'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Нотатки (необов\'язково)'})
         }
         labels = {
             'name': 'Назва',
             'email': 'Email',
             'phone': 'Телефон',
-            'address': 'Адреса'
+            'address': 'Адреса',
+            'notes': 'Нотатки'
         }
     
     def clean_name(self):

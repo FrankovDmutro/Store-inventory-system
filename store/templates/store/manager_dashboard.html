@@ -1,131 +1,123 @@
-<!DOCTYPE html>
-<html lang="uk">
-<head>
-    <meta charset="UTF-8">
-    <title>Менеджерська панель</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background: #f5f7fb; }
-        .card { border: none; box-shadow: 0 6px 20px rgba(0,0,0,0.05); }
-        .stat-value { font-size: 2rem; font-weight: 700; }
-    </style>
-</head>
-<body>
-<div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <h3 class="mb-0">📊 Менеджерська панель</h3>
-        <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-primary">{{ today }}</span>
-            <span class="text-muted">👤 {{ user.username }}</span>
-            <form method="post" action="{% url 'logout' %}" class="mb-0">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-sm btn-danger">Вихід</button>
-            </form>
-        </div>
-    </div>
-    {% include 'store/partials/manager_nav.html' %}
+{% extends 'store/base.html' %}
+{% block title %}Панель менеджера{% endblock %}
 
-    <div class="row g-3 mb-4">
-        <div class="col-md-6">
-            <div class="card bg-success text-white">
-                <div class="card-body">
-                    <div class="text-uppercase small fw-bold opacity-75">Каса за сьогодні</div>
-                    <div class="stat-value">{{ cash_today|floatformat:2 }} ₴</div>
-                    <div class="opacity-75">Сума всіх чеків за сьогодні</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card bg-info text-white">
-                <div class="card-body">
-                    <div class="text-uppercase small fw-bold opacity-75">Чистий прибуток</div>
-                    <div class="stat-value">{{ profit_today|floatformat:2 }} ₴</div>
-                    <div class="opacity-75">Прибуток за сьогодні</div>
-                </div>
+{% block content %}
+<div class="page-header">
+    <div>
+        <p class="page-subtitle text-uppercase mb-1">Оперативний огляд</p>
+        <h2 class="page-title">Панель менеджера</h2>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-primary">{{ today }}</span>
+        <span class="badge bg-dark text-white">{{ user.username }}</span>
+    </div>
+</div>
+
+{% include 'store/partials/manager_nav.html' %}
+
+<div class="row g-3 mb-3">
+    <div class="col-md-6">
+        <div class="card stat-card bg-success text-white card-hover">
+            <div class="card-body">
+                <div class="stat-label">Готівкові продажі сьогодні</div>
+                <div class="stat-value">{{ cash_today|floatformat:2 }} ₴</div>
+                <small class="text-white-75">Усі продажі за поточний день</small>
             </div>
         </div>
     </div>
-
-    <div class="row g-4">
-        <div class="col-lg-6">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>📉 Товари, що закінчуються</span>
-                    <span class="badge bg-warning text-dark">≤ 5 шт</span>
-                </div>
-                <div class="card-body p-0">
-                    {% if low_stock %}
-                    <table class="table mb-0 align-middle">
-                        <thead>
-                            <tr>
-                                <th>Товар</th>
-                                <th>Категорія</th>
-                                <th class="text-end">Залишок</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        {% for p in low_stock %}
-                            <tr>
-                                <td>{{ p.name }}</td>
-                                <td class="text-muted">{{ p.category.name }}</td>
-                                <td class="text-end"><span class="badge bg-danger">{{ p.quantity|floatformat:0 }} шт</span></td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                    {% else %}
-                        <div class="p-3 text-center text-muted">Немає позицій з низьким залишком</div>
-                    {% endif %}
-                </div>
+    <div class="col-md-6">
+        <div class="card stat-card bg-info text-white card-hover">
+            <div class="card-body">
+                <div class="stat-label">Прибуток сьогодні</div>
+                <div class="stat-value">{{ profit_today|floatformat:2 }} ₴</div>
+                <small class="text-white-75">Розрахований по всіх замовленнях</small>
             </div>
-        </div>
-        <div class="col-lg-6">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>🧾 Останні чеки</span>
-                    <a href="{% url 'manager_receipts_list' %}" class="btn btn-sm btn-outline-primary">Всі чеки</a>
-                </div>
-                <div class="card-body p-0">
-                    {% if latest_orders %}
-                    <table class="table mb-0 align-middle">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Дата</th>
-                                <th class="text-end">Сума</th>
-                                <th class="text-end">Прибуток</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        {% for o in latest_orders %}
-                            <tr>
-                                <td>{{ o.id }}</td>
-                                <td class="text-muted">{{ o.created_at|date:"Y-m-d H:i" }}</td>
-                                <td class="text-end fw-bold">{{ o.total_price|floatformat:2 }} ₴</td>
-                                <td class="text-end text-success">{{ o.total_profit|floatformat:2 }} ₴</td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                    {% else %}
-                        <div class="p-3 text-center text-muted">Чеків поки немає</div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card mt-4">
-        <div class="card-header">
-            <span>🚚 Поставки</span>
-        </div>
-        <div class="card-body text-center">
-            <p class="text-muted mb-3">Управління постачальниками та формування поставок</p>
-            <a href="{% url 'suppliers_list' %}" class="btn btn-lg btn-primary">
-                ➜ Перейти до поставок
-            </a>
         </div>
     </div>
 </div>
-</head>
-<body>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card card-hover h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Товари з низьким залишком</span>
+                <span class="badge bg-warning text-dark">топ 5</span>
+            </div>
+            <div class="card-body p-0">
+                {% if low_stock %}
+                    <div class="table-responsive">
+                        <table class="table mb-0 align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Назва</th>
+                                    <th>Категорія</th>
+                                    <th class="text-end">Кількість</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in low_stock %}
+                                    <tr>
+                                        <td class="fw-semibold">{{ p.name }}</td>
+                                        <td class="text-muted">{{ p.category.name }}</td>
+                                        <td class="text-end"><span class="badge bg-danger">{{ p.quantity|floatformat:0 }}</span></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="p-3 text-center text-muted">Усі залишки в нормі</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card card-hover h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Останні замовлення</span>
+                <a href="{% url 'manager_receipts_list' %}" class="btn btn-sm btn-outline-primary">Усі чеки</a>
+            </div>
+            <div class="card-body p-0">
+                {% if latest_orders %}
+                    <div class="table-responsive">
+                        <table class="table mb-0 align-middle">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Дата</th>
+                                    <th class="text-end">Сума</th>
+                                    <th class="text-end">Прибуток</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for o in latest_orders %}
+                                    <tr>
+                                        <td>{{ o.id }}</td>
+                                        <td class="text-muted">{{ o.created_at|date:"Y-m-d H:i" }}</td>
+                                        <td class="text-end fw-semibold">{{ o.total_price|floatformat:2 }} ₴</td>
+                                        <td class="text-end text-success fw-semibold">{{ o.total_profit|floatformat:2 }} ₴</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="p-3 text-center text-muted">Ще немає замовлень</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card card-hover mt-4">
+    <div class="card-body d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="mb-1">Контроль постачальників</h5>
+            <p class="text-muted mb-0">Оновіть дані постачальників та сформуйте закупівлі, щоб уникнути дефіциту.</p>
+        </div>
+        <a href="{% url 'suppliers_list' %}" class="btn btn-primary btn-lg">
+            Керувати закупівлями
+        </a>
+    </div>
+</div>
+{% endblock %}

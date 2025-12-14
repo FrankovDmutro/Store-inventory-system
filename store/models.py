@@ -212,6 +212,10 @@ class OrderItem(models.Model):
     
     def get_cost(self):
         return self.price * self.quantity
+    
+    # Alias для сумісності з шаблонами
+    def get_line_total(self):
+        return self.get_cost()
 
     def get_profit(self):
         return (self.price - self.purchase_price) * self.quantity

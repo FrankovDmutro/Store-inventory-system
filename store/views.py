@@ -197,25 +197,25 @@ def cart_checkout(request, category_id):
                 try:
                     # Блокування рядка для запобігання конкурентних оновлень
                     p = Product.objects.select_for_update().get(id=pid)
-                    qty_decimal = Decimal(str(qty))
+                    qty_int = int(float(qty))  # Конвертуємо в ціле число
                     
                     # Перевірка наявності
-                    if p.quantity >= qty_decimal:
+                    if p.quantity >= qty_int:
                         OrderItem.objects.create(
                             order=order,
                             product=p,
-                            quantity=qty_decimal,
+                            quantity=qty_int,
                             price=p.price,
                             purchase_price=p.purchase_price
                         )
                         # Використання F() для атомарного оновлення
                         Product.objects.filter(id=p.id).update(
-                            quantity=F('quantity') - qty_decimal
+                            quantity=F('quantity') - qty_int
                         )
-                        total += p.price * qty_decimal
-                        profit += (p.price - p.purchase_price) * qty_decimal
+                        total += p.price * qty_int
+                        profit += (p.price - p.purchase_price) * qty_int
                     else:
-                        logger.warning(f"Insufficient quantity for product {p.id}: {p.quantity} < {qty_decimal}")
+                        logger.warning(f"Insufficient quantity for product {p.id}: {p.quantity} < {qty_int}")
                         messages.warning(request, f"Товар '{p.name}' відсутній у потрібній кількості")
                 except (Product.DoesNotExist, ValueError, InvalidOperation) as e:
                     logger.error(f"Error processing product {pid}: {e}")
@@ -242,6 +242,8 @@ def cart_checkout(request, category_id):
             
     except Exception as e:
         logger.error(f"Error in cart_checkout: {e}")
+        if request.method == 'POST' and request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'error', 'message': 'Виникла помилка при оформленні чеку. Спробуйте ще раз.'}, status=500)
         messages.error(request, 'Виникла помилка при оформленні чеку. Спробуйте ще раз.')
         return redirect('category_detail', category_id=category_id)
 

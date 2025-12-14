@@ -1,33 +1,38 @@
-<!DOCTYPE html>
-<html lang="uk">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ category.name }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { height: 100vh; overflow: hidden; background-color: #f4f6f8; display: flex; flex-direction: column; }
-        .pos-header { height: 60px; background: white; border-bottom: 1px solid #ddd; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-        .main-layout { display: flex; flex: 1; overflow: hidden; }
-        .products-area { flex: 1; overflow-y: auto; padding: 20px; }
-        
-        .product-card { 
-            display: block; text-decoration: none; color: inherit;
-            background: white; border: 1px solid #eee; border-radius: 10px; 
-            cursor: pointer; transition: 0.15s; height: 100%;
-        }
-        .product-card:hover { border-color: #0d6efd; box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
-        .product-card:active { transform: scale(0.96); }
-        
-        .cart-area { width: 400px; background: white; border-left: 1px solid #ddd; display: flex; flex-direction: column; z-index: 10; box-shadow: -5px 0 15px rgba(0,0,0,0.03); }
-        .cart-list { flex: 1; overflow-y: auto; }
-        .cart-footer { padding: 20px; border-top: 1px solid #eee; background: #fff; }
+{% extends 'store/base.html' %}
+{% block title %}{{ category.name }}{% endblock %}
+{% block body_attrs %}data-cat-id="{{ category.id }}"{% endblock %}
 
-        @keyframes flash { 0% { background-color: #d1e7dd; } 100% { background-color: transparent; } }
-        .highlight-row { animation: flash 1s ease-out; }
-    </style>
-</head>
-<body data-cat-id="{{ category.id }}">
+{% block extra_css %}
+<style>
+    body {
+        height: 100vh;
+        overflow: hidden;
+        background-color: #f4f6f8;
+        display: flex;
+        flex-direction: column;
+    }
+    .pos-header { height: 60px; background: white; border-bottom: 1px solid #ddd; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .main-layout { display: flex; flex: 1; overflow: hidden; }
+    .products-area { flex: 1; overflow-y: auto; padding: 20px; }
+    
+    .product-card { 
+        display: block; text-decoration: none; color: inherit;
+        background: white; border: 1px solid #eee; border-radius: 10px; 
+        cursor: pointer; transition: 0.15s; height: 100%;
+    }
+    .product-card:hover { border-color: #0d6efd; box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
+    .product-card:active { transform: scale(0.96); }
+    
+    .cart-area { width: 400px; background: white; border-left: 1px solid #ddd; display: flex; flex-direction: column; z-index: 10; box-shadow: -5px 0 15px rgba(0,0,0,0.03); }
+    .cart-list { flex: 1; overflow-y: auto; }
+    .cart-footer { padding: 20px; border-top: 1px solid #eee; background: #fff; }
 
+    @keyframes flash { 0% { background-color: #d1e7dd; } 100% { background-color: transparent; } }
+    .highlight-row { animation: flash 1s ease-out; }
+</style>
+{% endblock %}
+
+{% block layout %}
 {% csrf_token %}
 
 <script>
@@ -43,16 +48,13 @@
 
 <div class="pos-header">
     <div style="width: 200px;">
-        <a href="{% url 'category_list' %}" class="btn btn-outline-dark fw-bold btn-sm">⬅ Меню</a>
+        <a href="{% url 'category_list' %}" class="btn btn-outline-dark fw-bold btn-sm">↩ Категорії</a>
     </div>
     <div style="flex: 1; max-width: 500px;">
-        <input type="text" id="searchInput" class="form-control" placeholder="🔍 Пошук товару..." autocomplete="off">
+        <input type="text" id="searchInput" class="form-control" placeholder="Пошук товару або штрихкоду..." autocomplete="off">
     </div>
     <div style="width: 200px; text-align: right;">
         <span class="fw-bold me-2">{{ user.username }}</span>
-        <form action="{% url 'logout' %}" method="post" style="display:inline;">{% csrf_token %}
-            <button class="btn btn-sm btn-danger">🚪</button>
-        </form>
     </div>
 </div>
 
@@ -78,7 +80,7 @@
                     {% if p.image %}
                         <img src="{{ p.image.url }}" style="height: 120px; object-fit: contain; width: 100%; padding: 10px;">
                     {% else %}
-                        <div class="d-flex align-items-center justify-content-center text-muted" style="height: 120px; background: #f8f9fa;">📷</div>
+                        <div class="d-flex align-items-center justify-content-center text-muted" style="height: 120px; background: #f8f9fa;">—</div>
                     {% endif %}
                     <div class="p-2 text-center border-top">
                         <div class="fw-bold text-truncate">{{ p.name }}</div>
@@ -91,7 +93,7 @@
             {% endfor %}
             
             {% if products_out_of_stock %}
-            <div class="col-12"><hr class="my-3"><h5 class="text-muted text-center">❌ Немає на складі</h5><hr class="my-3"></div>
+            <div class="col-12"><hr class="my-3"><h5 class="text-muted text-center">Немає в наявності</h5><hr class="my-3"></div>
             
             {% for p in products_out_of_stock %}
             <div class="col-md-3">
@@ -99,7 +101,7 @@
                     {% if p.image %}
                         <img src="{{ p.image.url }}" style="height: 120px; object-fit: contain; width: 100%; padding: 10px;">
                     {% else %}
-                        <div class="d-flex align-items-center justify-content-center text-muted" style="height: 120px; background: #f8f9fa;">📷</div>
+                        <div class="d-flex align-items-center justify-content-center text-muted" style="height: 120px; background: #f8f9fa;">—</div>
                     {% endif %}
                     <div class="p-2 text-center border-top">
                         <div class="fw-bold text-truncate">{{ p.name }}</div>
@@ -114,35 +116,33 @@
         </div>
     </div>
 
-    <!-- КОШИК -->
     <div class="cart-area">
         <div style="padding: 20px; border-bottom: 1px solid #eee;">
-            <h5 class="mb-0">🛒 КОШИК</h5>
+            <h5 class="mb-0">Поточний чек</h5>
         </div>
         <div class="cart-list">
             <table class="table table-sm table-hover mb-0" id="cartTable">
-                <tr id="emptyRow"><td colspan="3" class="text-center py-5 text-muted">Кошик пустий</td></tr>
+                <tr id="emptyRow"><td colspan="3" class="text-center py-5 text-muted">Кошик порожній</td></tr>
             </table>
         </div>
         <div class="cart-footer">
             <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
-                <span class="fw-bold">РАЗОМ:</span>
+                <span class="fw-bold">Разом:</span>
                 <span class="fw-bold text-primary" id="cartTotal" style="font-size: 1.2rem;">0.00 ₴</span>
             </div>
             <div style="display: flex; gap: 10px;">
-                <button class="btn btn-secondary flex-grow-1" onclick="location.reload()">🔄 Скинути</button>
-                <button class="btn btn-success btn-lg flex-grow-1" data-bs-toggle="modal" data-bs-target="#paymentModal">💰 Оплата</button>
+                <button class="btn btn-secondary flex-grow-1" onclick="location.reload()">Скинути</button>
+                <button class="btn btn-success btn-lg flex-grow-1" data-bs-toggle="modal" data-bs-target="#paymentModal">Оплата</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- МОДАЛЬ ОПЛАТИ -->
 <div class="modal fade" id="paymentModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">💳 Оплата за товари</h5>
+                <h5 class="modal-title">Оплата готівкою</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -154,46 +154,46 @@
                 </div>
                 
                 <div class="mb-3">
-                    <label for="cashInput" class="form-label fw-bold">Готівка отримана (₴):</label>
+                    <label for="cashInput" class="form-label fw-bold">Готівка від клієнта (₴):</label>
                     <input type="number" class="form-control form-control-lg" id="cashInput" placeholder="0.00" min="0" step="0.01">
                 </div>
                 
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Здача до видачі:</label>
+                    <label class="form-label fw-bold">Решта:</label>
                     <div class="alert" id="changeAlert" style="display: none;">
                         <h4 class="mb-0" id="changeAmount">0.00 ₴</h4>
                     </div>
                     <div id="noChangeAlert" class="alert alert-warning" style="display: none;">
-                        Будь ласка, введіть суму готівки
+                        Введіть суму, щоб розрахувати решту
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
-                <button type="button" class="btn btn-success btn-lg" id="confirmPaymentBtn">✅ Завершити оплату</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
+                <button type="button" class="btn btn-success btn-lg" id="confirmPaymentBtn">Підтвердити оплату</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- МОДАЛЬ ЧЕКА -->
 <div class="modal fade" id="receiptModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
-                <h5 class="modal-title">🧾 Чек</h5>
+                <h5 class="modal-title">Чек</h5>
             </div>
             <div class="modal-body" id="receiptContent" style="max-height: 60vh; overflow-y: auto;">
-                <!-- Сюди загружуватиметься HTML чека -->
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" id="downloadReceiptBtn">📥 Зберегти PDF</button>
-                <button type="button" class="btn btn-success" id="closeReceiptBtn" data-bs-dismiss="modal">✅ Готово</button>
+                <button type="button" class="btn btn-primary" id="downloadReceiptBtn">Завантажити PDF</button>
+                <button type="button" class="btn btn-success" id="closeReceiptBtn" data-bs-dismiss="modal">Готово</button>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
     const catId = document.body.dataset.catId;
     const grid = document.getElementById('productsGrid');
@@ -201,24 +201,20 @@
     const cartTotal = document.getElementById('cartTotal');
     const cartCount = document.getElementById('cartCount');
 
-    // === ПІДТРИМКА СКАНЕРА ШТРИХ-КОДІВ ===
     let barcodeBuffer = '';
     let barcodeTimeout = null;
-    const BARCODE_TIMEOUT = 100; // мілісекунди між символами для розпізнавання штрих-коду
+    const BARCODE_TIMEOUT = 100;
     
     document.addEventListener('keypress', function(e) {
-        // Ігноруємо, якщо фокус на input полі (окрім поля пошуку при швидкому введенні)
         const activeElement = document.activeElement;
         const isInputField = activeElement.tagName === 'INPUT' || 
                             activeElement.tagName === 'TEXTAREA' ||
                             activeElement.isContentEditable;
         
-        // Якщо це поле пошуку і введення повільне - дозволяємо звичайний пошук
         if (activeElement.id === 'searchInput' && barcodeBuffer.length < 3) {
             return;
         }
         
-        // Якщо це модальне вікно оплати - не обробляємо
         const paymentModal = document.getElementById('paymentModal');
         if (paymentModal && paymentModal.classList.contains('show')) {
             return;
@@ -229,10 +225,8 @@
             return;
         }
         
-        // Скидаємо таймер
         clearTimeout(barcodeTimeout);
         
-        // Enter - завершення вводу штрих-коду
         if (e.key === 'Enter' && barcodeBuffer.length >= 3) {
             e.preventDefault();
             processBarcodeInput(barcodeBuffer.trim());
@@ -240,11 +234,9 @@
             return;
         }
         
-        // Збираємо символи (цифри, літери для артикулів)
         if (e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey) {
             barcodeBuffer += e.key;
             
-            // Автоматично обробляємо, якщо набрано багато символів (довгий штрих-код)
             if (barcodeBuffer.length >= 13) {
                 e.preventDefault();
                 processBarcodeInput(barcodeBuffer.trim());
@@ -252,9 +244,7 @@
                 return;
             }
             
-            // Встановлюємо таймер для скидання буфера
             barcodeTimeout = setTimeout(() => {
-                // Якщо введення закінчилось і є дані - обробляємо
                 if (barcodeBuffer.length >= 3) {
                     processBarcodeInput(barcodeBuffer.trim());
                 }
@@ -264,39 +254,31 @@
     });
     
     function processBarcodeInput(barcode) {
-        console.log('🔍 Сканер штрих-коду:', barcode);
-        
-        // Шукаємо товар по артикулу (SKU)
         fetch(`${APP_URLS.productSearch}?q=${encodeURIComponent(barcode)}&category_id=${catId}`)
         .then(res => res.ok ? res.json() : Promise.reject('Network error'))
         .then(data => {
             const allProducts = [...data.here, ...data.others];
             
             if (allProducts.length === 0) {
-                showBarcodeNotification('❌ Товар не знайдено', 'danger');
+                showBarcodeNotification('Товар не знайдено', 'danger');
                 return;
             }
             
-            // Шукаємо точний збіг по SKU
             let product = allProducts.find(p => p.sku && p.sku.toLowerCase() === barcode.toLowerCase());
             
-            // Якщо не знайдено точний збіг, беремо перший результат
             if (!product) {
                 product = allProducts[0];
             }
             
-            // Перевіряємо наявність
             if (parseFloat(product.quantity) <= 0) {
-                showBarcodeNotification(`⚠️ ${product.name} - немає на складі`, 'warning');
+                showBarcodeNotification(`Немає в наявності: ${product.name}`, 'warning');
                 return;
             }
             
-            // Додаємо товар у кошик
             addProductToCart(product.id, product.name);
         })
-        .catch(error => {
-            console.error('Помилка пошуку:', error);
-            showBarcodeNotification('❌ Помилка пошуку товару', 'danger');
+        .catch(() => {
+            showBarcodeNotification('Помилка пошуку', 'danger');
         });
     }
     
@@ -318,19 +300,17 @@
         .then(data => {
             if(data.status === 'success') {
                 updateCartUI(data);
-                showBarcodeNotification(`✅ ${productName} додано`, 'success');
+                showBarcodeNotification(`Додано: ${productName}`, 'success');
             } else {
                 showBarcodeNotification(data.message || 'Помилка', 'danger');
             }
         })
-        .catch(error => {
-            console.error('Error:', error);
-            showBarcodeNotification('❌ Помилка додавання', 'danger');
+        .catch(() => {
+            showBarcodeNotification('Не вдалося додати товар', 'danger');
         });
     }
     
     function showBarcodeNotification(message, type = 'info') {
-        // Створюємо повідомлення
         const notification = document.createElement('div');
         notification.className = `alert alert-${type} position-fixed top-0 start-50 translate-middle-x mt-5`;
         notification.style.zIndex = '9999';
@@ -343,7 +323,6 @@
         
         document.body.appendChild(notification);
         
-        // Видаляємо через 2 секунди
         setTimeout(() => {
             notification.style.transition = 'opacity 0.3s';
             notification.style.opacity = '0';
@@ -351,18 +330,14 @@
         }, 2000);
     }
 
-    // 1. ДОДАВАННЯ В КОШИК (AJAX)
     document.addEventListener('click', function(e) {
         const card = e.target.closest('.add-btn');
         if (card) {
             e.preventDefault();
             const pid = card.dataset.id;
-
-            // Ефект натискання
             card.style.transform = "scale(0.96)";
             setTimeout(() => card.style.transform = "scale(1)", 100);
 
-            // Відправка запиту
             fetch(`${APP_URLS.cartAdd}${pid}/`, { 
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
@@ -381,12 +356,10 @@
                 if(data.status === 'success') {
                     updateCartUI(data);
                 } else {
-                    showBarcodeNotification(data.message || 'Помилка при додаванні товару', 'danger');
+                    showBarcodeNotification(data.message || 'Помилка', 'danger');
                 }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                // Фолбек: якщо JSON не прийшов або мережа впала — робимо звичайний перехід
+            .catch(() => {
                 window.location.href = `${APP_URLS.cartAdd}${pid}/`;
             });
         }
@@ -410,13 +383,11 @@
                 <td class="text-end pe-3 align-middle fw-bold">${parseFloat(item.total).toFixed(2)} ₴</td>
             </tr>`;
         });
-        cartTable.innerHTML = html || `<tr id="emptyRow"><td colspan="3" class="text-center py-5 text-muted">Кошик пустий</td></tr>`;
+        cartTable.innerHTML = html || `<tr id="emptyRow"><td colspan="3" class="text-center py-5 text-muted">Кошик порожній</td></tr>`;
         
-        // Автоскрол вниз
         document.querySelector('.cart-list').scrollTop = document.querySelector('.cart-list').scrollHeight;
     }
 
-    // Функція для екранування HTML
     function escapeHtml(text) {
         const map = {
             '&': '&amp;',
@@ -428,7 +399,6 @@
         return text.replace(/[&<>"']/g, m => map[m]);
     }
 
-    // 3. ОПЛАТА ЧЕРЕЗ МОДАЛЬ
     const paymentModal = document.getElementById('paymentModal');
     const cashInput = document.getElementById('cashInput');
     const totalAmount = document.getElementById('totalAmount');
@@ -437,17 +407,13 @@
     const noChangeAlert = document.getElementById('noChangeAlert');
     const confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
     
-    // Показуємо модаль при натисканні на кнопку оплати
     paymentModal.addEventListener('show.bs.modal', function() {
-        // Встановлюємо суму до сплати
         totalAmount.textContent = parseFloat(cartTotal.textContent).toFixed(2) + ' ₴';
-        // Очищаємо поле введення
         cashInput.value = '';
         cashInput.focus();
         updateChange();
     });
     
-    // Розрахунок здачи при введенні готівки
     cashInput.addEventListener('input', updateChange);
     
     function updateChange() {
@@ -465,14 +431,11 @@
         noChangeAlert.style.display = 'none';
         
         if (change < 0) {
-            // Не вистачає готівки
             changeAlert.innerHTML = `<h4 class="mb-0 text-danger">Не вистачає: ${Math.abs(change).toFixed(2)} ₴</h4>`;
             changeAlert.className = 'alert alert-danger';
             changeAlert.style.display = 'block';
             confirmPaymentBtn.disabled = true;
         } else {
-            // Достатньо готівки - показуємо здачу
-            changeAmount.textContent = change.toFixed(2) + ' ₴';
             changeAlert.className = 'alert alert-success';
             changeAlert.innerHTML = `<h4 class="mb-0" id="changeAmount">${change.toFixed(2)} ₴</h4>`;
             changeAlert.style.display = 'block';
@@ -480,26 +443,22 @@
         }
     }
     
-    // Завершення оплати
     confirmPaymentBtn.addEventListener('click', function() {
         const total = parseFloat(cartTotal.textContent) || 0;
         const cash = parseFloat(cashInput.value) || 0;
         const change = cash - total;
         
         if (change < 0) {
-            showBarcodeNotification('Не вистачає готівки!', 'warning');
+            showBarcodeNotification('Недостатньо коштів', 'warning');
             return;
         }
         
-        // Закриваємо модаль оплати
         const paymentModal = bootstrap.Modal.getInstance(document.getElementById('paymentModal'));
         paymentModal.hide();
         
-        // Показуємо лоадер
         const receiptContent = document.getElementById('receiptContent');
         receiptContent.innerHTML = '<div class="text-center py-5"><div class="spinner-border" role="status"><span class="visually-hidden">Завантаження...</span></div></div>';
         
-        // Виконуємо checkout та отримуємо чек
         fetch(APP_URLS.checkout, {
             method: 'POST',
             headers: {
@@ -509,59 +468,55 @@
             },
             credentials: 'same-origin'
         })
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
+            return res.json();
+        })
         .then(data => {
             if (data.status === 'success') {
                 const orderId = data.order_id;
                 
-                // Отримуємо дані чека
                 return fetch(`${APP_URLS.receiptDetails}${orderId}/details/`, {
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                }).then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
                     }
-                }).then(res => res.json()).then(receiptData => {
+                    return res.json();
+                }).then(receiptData => {
                     if (receiptData.status === 'success') {
-                        // Показуємо чек у модалі
                         receiptContent.innerHTML = receiptData.receipt_html;
-                        
-                        // Встановлюємо ID замовлення для завантаження PDF
                         document.getElementById('downloadReceiptBtn').dataset.orderId = orderId;
-                        
-                        // Показуємо модаль чека
                         const receiptModal = new bootstrap.Modal(document.getElementById('receiptModal'));
                         receiptModal.show();
                         
-                        // Обробляємо закриття чека
                         document.getElementById('closeReceiptBtn').onclick = function() {
                             receiptModal.hide();
-                            // Редіректимо на категорії з повідомленням
                             setTimeout(() => {
                                 window.location.href = `{% url "category_list" %}?success=1`;
                             }, 300);
                         };
                     } else {
-                        throw new Error('Помилка при отриманні чека');
+                        throw new Error('Не вдалося зчитати чек');
                     }
                 });
             } else {
-                throw new Error(data.message || 'Помилка при оформленні чеку');
+                throw new Error(data.message || 'Не вдалося завершити оплату');
             }
         })
         .catch(error => {
-            console.error('Error:', error);
             showBarcodeNotification('Помилка: ' + error.message, 'danger');
-            // Повертаємо користувача до поточної сторінки
             setTimeout(() => location.reload(), 2500);
         });
     });
     
-    // Завантаження PDF чека
     document.getElementById('downloadReceiptBtn').addEventListener('click', function() {
         const orderId = this.dataset.orderId;
         window.location.href = `${APP_URLS.receiptPdf}${orderId}/download-pdf/`;
     });
 
-    // 4. ПОШУК ТОВАРІВ
     let searchTimeout;
     document.getElementById('searchInput').addEventListener('input', function(e) {
         const q = e.target.value.trim();
@@ -591,15 +546,13 @@
                     return; 
                 }
 
-                // Розділяємо товари на наявні та відсутні
                 const inStock = all.filter(p => parseFloat(p.quantity) > 0);
                 const outOfStock = all.filter(p => parseFloat(p.quantity) <= 0);
                 
-                // Спочатку показуємо товари в наявності
                 inStock.forEach(p => {
                     const imgHtml = p.image_url ? 
                         `<img src="${p.image_url}" style="height: 120px; object-fit: contain; width: 100%; padding: 10px;">` : 
-                        `<div class="d-flex align-items-center justify-content-center text-muted" style="height: 120px; background: #f8f9fa;">📷</div>`;
+                        `<div class="d-flex align-items-center justify-content-center text-muted" style="height: 120px; background: #f8f9fa;">—</div>`;
                     const badge = (p.category_name) ? 
                         `<span class="badge bg-warning text-dark position-absolute top-0 start-0 m-2">${escapeHtml(p.category_name)}</span>` : '';
                     
@@ -617,14 +570,13 @@
                     </div>`;
                 });
                 
-                // Якщо є товари без залишків - показуємо роздільник
                 if (outOfStock.length > 0) {
-                    grid.innerHTML += '<div class="col-12"><hr class="my-3"><h5 class="text-muted text-center">❌ Немає на складі</h5><hr class="my-3"></div>';
+                    grid.innerHTML += '<div class="col-12"><hr class="my-3"><h5 class="text-muted text-center">Немає в наявності</h5><hr class="my-3"></div>';
                     
                     outOfStock.forEach(p => {
                         const imgHtml = p.image_url ? 
                             `<img src="${p.image_url}" style="height: 120px; object-fit: contain; width: 100%; padding: 10px;">` : 
-                            `<div class="d-flex align-items-center justify-content-center text-muted" style="height: 120px; background: #f8f9fa;">📷</div>`;
+                            `<div class="d-flex align-items-center justify-content-center text-muted" style="height: 120px; background: #f8f9fa;">—</div>`;
                         const badge = (p.category_name) ? 
                             `<span class="badge bg-warning text-dark position-absolute top-0 start-0 m-2">${escapeHtml(p.category_name)}</span>` : '';
                         
@@ -643,15 +595,10 @@
                     });
                 }
             })
-            .catch(error => {
-                console.error('Error:', error);
+            .catch(() => {
                 grid.innerHTML = '<div class="col-12 text-center text-danger mt-5">Помилка пошуку</div>';
             });
-        }, 300);  // Debounce 300ms
+        }, 300);
     });
 </script>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-</body>
-</html>
+{% endblock %}

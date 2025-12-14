@@ -34,16 +34,29 @@ def role_home_url(role_level):
     return settings.LOGIN_URL
 
 
-def role_required(required_role_level):
-    """Декоратор: пускає тільки точну роль, інших тихо переспрямовує додому."""
+def role_required(required_role_level, allow_higher=True):
+    """
+    Декоратор для перевірки рівня доступу.
+    
+    Args:
+        required_role_level: мінімальний рівень ролі для доступу
+        allow_higher: якщо True, вищі ролі також мають доступ (менеджер може бути касиром)
+    """
 
     def decorator(view_func):
         @wraps(view_func)
         def _wrapped_view(request, *args, **kwargs):
             user_level = get_role_level(request.user)
 
-            if user_level != required_role_level:
-                return redirect(role_home_url(user_level))
+            # Перевірка доступу: якщо allow_higher=True, вищі ролі мають доступ
+            if allow_higher:
+                # Вищі ролі (ADMIN >= MANAGER >= CASHIER) мають доступ
+                if user_level < required_role_level:
+                    return redirect(role_home_url(user_level))
+            else:
+                # Точна відповідність ролі
+                if user_level != required_role_level:
+                    return redirect(role_home_url(user_level))
 
             return view_func(request, *args, **kwargs)
 
