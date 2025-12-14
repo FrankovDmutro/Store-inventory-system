@@ -96,6 +96,11 @@ DATABASES = {
             'charset': 'utf8mb4',
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES', time_zone='+02:00'",
         },
+        # Ensure test DB is created with UTF8MB4 to store Cyrillic permission names
+        'TEST': {
+            'CHARSET': 'utf8mb4',
+            'COLLATION': 'utf8mb4_unicode_ci',
+        },
     }
 }
 
