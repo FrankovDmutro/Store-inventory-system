@@ -1,17 +1,49 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction, connection
 from django.utils import timezone
+from django.core.files.base import ContentFile
 from decimal import Decimal
 from datetime import timedelta
 from store.models import Category, Product, Supplier, Order, OrderItem, WriteOff, Return, ReturnItem, Purchase, PurchaseItem
 from django.contrib.auth.models import User
 import random
+import requests
 
 class Command(BaseCommand):
     help = 'Seed database with demo data (categories, products, orders, writeoffs)'
 
     def add_arguments(self, parser):
         parser.add_argument('--clear', action='store_true', help='Clear all data except users and groups first')
+        parser.add_argument('--with-images', action='store_true', help='Download product images from LoremFlickr')
+
+    def download_product_image(self, product, category_name):
+        """Завантажує картинку для товару з LoremFlickr"""
+        # Словник для пошуку картинок (UA -> EN)
+        cat_translation = {
+            'Молочні продукти': 'dairy',
+            'Хлібобулочні вироби': 'bread',
+            'Напої': 'drink',
+            'Снеки та цукерки': 'snacks',
+            'Фрукти': 'fruit',
+            'Овочі': 'vegetable',
+        }
+        
+        search_keyword = cat_translation.get(category_name, 'food')
+        
+        try:
+            # Запитуємо випадкову картинку 320x240 по темі категорії
+            image_url = f"https://loremflickr.com/320/240/{search_keyword}/all"
+            response = requests.get(image_url, timeout=5)
+            
+            if response.status_code == 200:
+                # Зберігаємо файл у поле image
+                file_name = f"{product.sku}.jpg"
+                product.image.save(file_name, ContentFile(response.content), save=True)
+                return True
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"    ⚠️ Помилка при завантаженні фото: {str(e)[:50]}"))
+        
+        return False
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -550,7 +582,14 @@ class Command(BaseCommand):
             )
             if created:
                 created_count += 1
-                self.stdout.write(f"  ✓ {prod.name}")
+                status = f"  ✓ {prod.name}"
+                
+                # Завантажуємо картинку якщо запущено з --with-images
+                if options.get('with_images'):
+                    if self.download_product_image(prod, prod_data['category']):
+                        status += " 🖼️"
+                
+                self.stdout.write(status)
 
         self.stdout.write(self.style.SUCCESS(f'Створено товарів: {created_count}'))
 
