@@ -184,7 +184,11 @@ def cart_clear(request, category_id):
     if 'cart' in request.session:
         del request.session['cart']
         request.session.modified = True
-        messages.info(request, 'Кошик очищено.')
+
+    # AJAX варіант для SPA-подібних екранів POS
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'status': 'success'})
+
     return redirect('category_detail', category_id=category_id)
 
 @login_required

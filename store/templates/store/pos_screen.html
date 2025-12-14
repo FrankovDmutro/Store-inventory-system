@@ -42,7 +42,8 @@
         checkout: "{% url 'cart_checkout' category.id %}",
         receiptDetails: "{% url 'receipt_details' 0 %}".replace('0/details/', ''),
         receiptPdf: "{% url 'receipt_download_pdf' 0 %}".replace('0/download-pdf/', ''),
-        categoryList: "{% url 'category_list' %}"
+        categoryList: "{% url 'category_list' %}",
+        cartClear: "{% url 'cart_clear' category.id %}"
     };
 </script>
 
@@ -131,7 +132,7 @@
                 <span class="fw-bold text-primary" id="cartTotal" style="font-size: 1.2rem;">0.00 ₴</span>
             </div>
             <div style="display: flex; gap: 10px;">
-                <button class="btn btn-secondary flex-grow-1" onclick="location.reload()">Скинути</button>
+                <button class="btn btn-secondary flex-grow-1" onclick="clearCart()">Скинути</button>
                 <button class="btn btn-success btn-lg flex-grow-1" data-bs-toggle="modal" data-bs-target="#paymentModal">Оплата</button>
             </div>
         </div>
@@ -364,6 +365,30 @@
             });
         }
     });
+
+    async function clearCart() {
+        try {
+            const res = await fetch(APP_URLS.cartClear, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+        } catch (e) {
+            // fallback: hard reload
+            window.location.href = APP_URLS.cartClear;
+            return;
+        }
+        // wipe UI instantly
+        cartTable.innerHTML = `<tr id="emptyRow"><td colspan="3" class="text-center py-5 text-muted">Кошик порожній</td></tr>`;
+        cartTotal.innerText = '0.00 ₴';
+        if (cartCount) {
+            cartCount.innerText = '0';
+        }
+    }
 
     function updateCartUI(data) {
         cartTotal.innerText = parseFloat(data.cart_total).toFixed(2) + ' ₴';

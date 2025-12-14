@@ -132,7 +132,8 @@
         checkout: "{% url 'cart_checkout' 0 %}".replace('/0/', '/'),
         receiptDetails: "{% url 'receipt_details' 0 %}".replace('0/details/', ''),
         receiptPdf: "{% url 'receipt_download_pdf' 0 %}".replace('0/download-pdf/', ''),
-        categoryList: "{% url 'category_list' %}"
+        categoryList: "{% url 'category_list' %}",
+        cartClear: "{% url 'cart_clear' 0 %}".replace('/0/', '/')
     };
 </script>
 
@@ -244,7 +245,7 @@
                 <span class="fw-bold text-primary" id="cartTotal" style="font-size: 1.2rem;">0.00 ₴</span>
             </div>
             <div style="display: flex; gap: 10px;">
-                <button class="btn btn-secondary flex-grow-1" onclick="location.reload()">Скинути</button>
+                <button class="btn btn-secondary flex-grow-1" onclick="clearCart()">Скинути</button>
                 <button class="btn btn-success btn-lg flex-grow-1" data-bs-toggle="modal" data-bs-target="#paymentModal">Оплата</button>
             </div>
         </div>
@@ -533,6 +534,35 @@
             "'": '&#039;'
         };
         return text.replace(/[&<>"']/g, m => map[m]);
+    }
+
+    async function clearCart() {
+        // беремо першу категорію для побудови URL (кошик не залежить від категорії)
+        const firstProduct = document.querySelector('.add-btn');
+        const categoryId = firstProduct ? firstProduct.closest('[data-category-id]')?.dataset.categoryId || firstProduct.dataset.categoryId : 1;
+
+        try {
+            const res = await fetch(`${APP_URLS.cartClear}${categoryId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+        } catch (e) {
+            // fallback — повний перехід за посиланням
+            window.location.href = `${APP_URLS.cartClear}${categoryId}/`;
+            return;
+        }
+
+        // Миттєво чистимо UI
+        cartTable.innerHTML = `<tr id="emptyRow"><td colspan="3" class="text-center py-5 text-muted">Кошик порожній</td></tr>`;
+        cartTotal.innerText = '0.00 ₴';
+        if (cartCount) {
+            cartCount.innerText = '0';
+        }
     }
 
     // Логіка оплати
