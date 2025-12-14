@@ -44,10 +44,6 @@
                         <a class="nav-link {% if url_name == 'writeoffs_list' or url_name == 'writeoff_create' or url_name == 'expired_products' %}active{% endif %}" href="{% url 'writeoffs_list' %}">
                             <i class="fas fa-trash-alt me-1"></i>Списання
                         </a>
-                        <!-- Менеджер також може використовувати POS -->
-                        <a class="nav-link {% if url_name == 'category_list' or url_name == 'category_detail' %}active{% endif %}" href="{% url 'category_list' %}">
-                            <i class="fas fa-cash-register me-1"></i>POS
-                        </a>
                     {% endif %}
                     {% if user|has_group:"Cashiers" and not user|has_group:"Managers" and not user.is_staff %}
                         <a class="nav-link {% if url_name == 'category_list' %}active{% endif %}" href="{% url 'category_list' %}">
