@@ -30,6 +30,17 @@
 
 {% csrf_token %}
 
+<script>
+    const APP_URLS = {
+        cartAdd: "{% url 'cart_add' 0 %}".slice(0, -2),
+        productSearch: "{% url 'search_products' %}",
+        checkout: "{% url 'cart_checkout' category.id %}",
+        receiptDetails: "{% url 'receipt_details' 0 %}".slice(0, -2),
+        receiptPdf: "{% url 'receipt_download_pdf' 0 %}".slice(0, -2),
+        categoryList: "{% url 'category_list' %}"
+    };
+</script>
+
 <div class="pos-header">
     <div style="width: 200px;">
         <a href="{% url 'category_list' %}" class="btn btn-outline-dark fw-bold btn-sm">⬅ Меню</a>
@@ -256,7 +267,7 @@
         console.log('🔍 Сканер штрих-коду:', barcode);
         
         // Шукаємо товар по артикулу (SKU)
-        fetch(`/store/api/search/?q=${encodeURIComponent(barcode)}&category_id=${catId}`)
+        fetch(`${APP_URLS.productSearch}?q=${encodeURIComponent(barcode)}&category_id=${catId}`)
         .then(res => res.ok ? res.json() : Promise.reject('Network error'))
         .then(data => {
             const allProducts = [...data.here, ...data.others];
@@ -290,7 +301,7 @@
     }
     
     function addProductToCart(productId, productName) {
-        fetch(`/store/cart/add/${productId}/`, { 
+        fetch(`${APP_URLS.cartAdd}${productId}/`, { 
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
                 'Accept': 'application/json'
@@ -352,7 +363,7 @@
             setTimeout(() => card.style.transform = "scale(1)", 100);
 
             // Відправка запиту
-            fetch(`/store/cart/add/${pid}/`, { 
+            fetch(`${APP_URLS.cartAdd}${pid}/`, { 
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json'
@@ -376,7 +387,7 @@
             .catch(error => {
                 console.error('Error:', error);
                 // Фолбек: якщо JSON не прийшов або мережа впала — робимо звичайний перехід
-                window.location.href = `/store/cart/add/${pid}/`;
+                window.location.href = `${APP_URLS.cartAdd}${pid}/`;
             });
         }
     });
@@ -489,7 +500,7 @@
         receiptContent.innerHTML = '<div class="text-center py-5"><div class="spinner-border" role="status"><span class="visually-hidden">Завантаження...</span></div></div>';
         
         // Виконуємо checkout та отримуємо чек
-        fetch(`/store/cart/checkout/${catId}/`, {
+        fetch(APP_URLS.checkout, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
@@ -504,7 +515,7 @@
                 const orderId = data.order_id;
                 
                 // Отримуємо дані чека
-                return fetch(`/store/receipt/${orderId}/details/`, {
+                return fetch(`${APP_URLS.receiptDetails}${orderId}/details/`, {
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest'
                     }
@@ -547,7 +558,7 @@
     // Завантаження PDF чека
     document.getElementById('downloadReceiptBtn').addEventListener('click', function() {
         const orderId = this.dataset.orderId;
-        window.location.href = `/store/receipt/${orderId}/download-pdf/`;
+        window.location.href = `${APP_URLS.receiptPdf}${orderId}/download-pdf/`;
     });
 
     // 4. ПОШУК ТОВАРІВ
@@ -567,7 +578,7 @@
         document.getElementById('catTitle').style.display = 'none';
 
         searchTimeout = setTimeout(() => {
-            fetch(`/store/api/search/?q=${encodeURIComponent(q)}&category_id=${catId}`)
+            fetch(`${APP_URLS.productSearch}?q=${encodeURIComponent(q)}&category_id=${catId}`)
             .then(res => {
                 if (!res.ok) throw new Error('Network response was not ok');
                 return res.json();
