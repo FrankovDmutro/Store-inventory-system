@@ -67,37 +67,6 @@ class PurchaseItemForm(forms.Form):
         return product_id
 
 
-class CartItemForm(forms.Form):
-    """Форма для валідації товару в кошику."""
-    
-    product_id = forms.IntegerField(min_value=1)
-    quantity = forms.IntegerField(min_value=1)
-    
-    def clean_product_id(self):
-        """Перевірка існування товару."""
-        product_id = self.cleaned_data.get('product_id')
-        if product_id:
-            try:
-                self.product = Product.objects.get(id=product_id)
-            except Product.DoesNotExist:
-                raise ValidationError('Товар не знайдено.')
-        return product_id
-    
-    def clean(self):
-        """Перевірка наявності товару на складі."""
-        cleaned_data = super().clean()
-        quantity = cleaned_data.get('quantity')
-        
-        if hasattr(self, 'product') and quantity:
-            if self.product.quantity < quantity:
-                raise ValidationError(
-                    f'Недостатньо товару "{self.product.name}". '
-                    f'Доступно: {self.product.quantity}, потрібно: {quantity}'
-                )
-        
-        return cleaned_data
-
-
 class WriteOffForm(forms.ModelForm):
     """Форма для списання товарів."""
     

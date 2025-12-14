@@ -11,20 +11,15 @@ from datetime import timedelta
 import json
 import logging
 from .models import Product, Category, Order, OrderItem, Supplier, Purchase, PurchaseItem, WriteOff, Return, ReturnItem
-from .forms import SupplierForm, PurchaseItemForm, CartItemForm, WriteOffForm
+from .forms import SupplierForm, PurchaseItemForm, WriteOffForm
 from .services import PurchaseService, OrderService, SupplierService, ReceiptService
 from .utils import role_required, ROLE_CASHIER, ROLE_MANAGER
 
 logger = logging.getLogger(__name__)
 
-@login_required
-@role_required(ROLE_CASHIER)
-def category_list(request):
-    categories = Category.objects.all().prefetch_related(
-        'product_set'
-    )
-    
-    # Отримуємо кошик для початкового завантаження
+# === ДОПОМІЖНІ ФУНКЦІЇ ===
+def _get_cart_context(request):
+    """Отримує дані кошика для контексту шаблону."""
     cart = request.session.get('cart', {})
     cart_items = []
     cart_total_price = Decimal('0')
@@ -39,10 +34,19 @@ def category_list(request):
         except (Product.DoesNotExist, ValueError, InvalidOperation):
             continue
     
-    return render(request, 'store/category_list.html', {
-        'categories': categories,
+    return {
         'cart_items': cart_items,
         'cart_total_price': cart_total_price
+    }
+
+@login_required
+@role_required(ROLE_CASHIER)
+def category_list(request):
+    categories = Category.objects.all().prefetch_related('product_set')
+    
+    return render(request, 'store/category_list.html', {
+        'categories': categories,
+        **_get_cart_context(request)
     })
 
 @login_required
@@ -58,28 +62,12 @@ def category_detail(request, category_id):
     products_out_of_stock = Product.objects.filter(
         category=category, quantity__lte=0
     ).select_related('category').order_by('name')
-    
-    # Отримуємо кошик для початкового завантаження
-    cart = request.session.get('cart', {})
-    cart_items = []
-    cart_total_price = Decimal('0')
-    
-    for pid, qty in cart.items():
-        try:
-            p = Product.objects.get(id=pid)
-            qty_decimal = Decimal(str(qty))
-            total = p.price * qty_decimal
-            cart_total_price += total
-            cart_items.append({'product': p, 'quantity': float(qty_decimal), 'total': total})
-        except (Product.DoesNotExist, ValueError, InvalidOperation):
-            continue
 
     return render(request, 'store/pos_screen.html', {
         'category': category,
         'products_in_stock': products_in_stock,
         'products_out_of_stock': products_out_of_stock,
-        'cart_items': cart_items,
-        'cart_total_price': cart_total_price
+        **_get_cart_context(request)
     })
 
 # === ГІБРИДНА ФУНКЦІЯ ДОДАВАННЯ (AJAX + звичайна) ===
