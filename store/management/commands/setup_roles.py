@@ -1,15 +1,15 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
-from store.models import Product, Category, Order, OrderItem, Supplier, Purchase
+from store.models import Product, Category, Order, OrderItem, Supplier, Purchase, GROUP_CASHIER, GROUP_MANAGER
 
 
 class Command(BaseCommand):
     help = 'Створює групи Cashiers та Managers і налаштовує їм права'
 
     def handle(self, *args, **kwargs):
-        cashier_group, _ = Group.objects.get_or_create(name='Cashiers')
-        manager_group, _ = Group.objects.get_or_create(name='Managers')
+        cashier_group, _ = Group.objects.get_or_create(name=GROUP_CASHIER)
+        manager_group, _ = Group.objects.get_or_create(name=GROUP_MANAGER)
 
         # === Контент-тайпи (моделі) ===
         ct_product = ContentType.objects.get_for_model(Product)

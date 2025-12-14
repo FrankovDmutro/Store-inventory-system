@@ -5,6 +5,10 @@ from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 from decimal import Decimal
 
+# Константи для назв груп користувачів
+GROUP_CASHIER = 'Cashiers'
+GROUP_MANAGER = 'Managers'
+
 
 class Supplier(models.Model):
     name = models.CharField(max_length=200, verbose_name="Постачальник")

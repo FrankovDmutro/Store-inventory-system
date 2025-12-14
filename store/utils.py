@@ -2,6 +2,7 @@ from functools import wraps
 from django.conf import settings
 from django.shortcuts import redirect
 from django.urls import reverse
+from .models import GROUP_CASHIER, GROUP_MANAGER
 
 # Чітка відповідність ролей: кожен має свою зону
 ROLE_NONE = 0
@@ -15,9 +16,9 @@ def get_role_level(user):
         return ROLE_NONE
     if user.is_superuser:
         return ROLE_ADMIN
-    if user.groups.filter(name='Managers').exists() or user.is_staff:
+    if user.groups.filter(name=GROUP_MANAGER).exists() or user.is_staff:
         return ROLE_MANAGER
-    if user.groups.filter(name='Cashiers').exists():
+    if user.groups.filter(name=GROUP_CASHIER).exists():
         return ROLE_CASHIER
     # За замовчуванням відносимо до касирів, щоб не блокувати користувача без групи
     return ROLE_CASHIER

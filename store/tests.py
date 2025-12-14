@@ -18,6 +18,8 @@ from .models import (
 	Return,
 	Supplier,
 	WriteOff,
+	GROUP_CASHIER,
+	GROUP_MANAGER,
 )
 from .forms import SupplierForm, WriteOffForm
 from .services import OrderService, PurchaseService, ReceiptService
@@ -26,8 +28,8 @@ from .services import OrderService, PurchaseService, ReceiptService
 class BaseStoreTestCase(TestCase):
 	def setUp(self):
 		# Roles used by the role_required decorator in views
-		self.cashiers_group, _ = Group.objects.get_or_create(name="Cashiers")
-		self.managers_group, _ = Group.objects.get_or_create(name="Managers")
+		self.cashiers_group, _ = Group.objects.get_or_create(name=GROUP_CASHIER)
+		self.managers_group, _ = Group.objects.get_or_create(name=GROUP_MANAGER)
 
 		self.cashier = User.objects.create_user(username="cashier", password="pass")
 		self.cashier.groups.add(self.cashiers_group)
