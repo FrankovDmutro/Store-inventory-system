@@ -1,69 +1,751 @@
 {% extends 'store/base.html' %}
-{% block title %}Категорії | SIS{% endblock %}
+{% block title %}POS - Касса | SIS{% endblock %}
+{% block body_attrs %}data-all-categories="true"{% endblock %}
 
-{% block content %}
-<div class="page-header">
-    <div>
-        <p class="page-subtitle text-uppercase mb-1">POS</p>
-        <h2 class="page-title">Оберіть категорію</h2>
-        <p class="page-subtitle">Швидкий перехід до продажів за потрібною групою товарів.</p>
+{% block extra_css %}
+<style>
+    body {
+        height: 100vh;
+        overflow: hidden;
+        background-color: #f4f6f8;
+        display: flex;
+        flex-direction: column;
+    }
+    .pos-header { 
+        height: 60px; 
+        background: white; 
+        border-bottom: 1px solid #ddd; 
+        padding: 0 20px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between; 
+        flex-shrink: 0; 
+    }
+    .main-layout { 
+        display: flex; 
+        flex: 1; 
+        overflow: hidden; 
+    }
+    .categories-menu { 
+        width: 180px; 
+        background: #f8f9fa; 
+        border-right: 1px solid #ddd; 
+        overflow-y: auto; 
+        flex-shrink: 0;
+    }
+    .category-btn {
+        display: block;
+        width: 100%;
+        padding: 12px 15px;
+        text-align: left;
+        border: none;
+        background: transparent;
+        color: #333;
+        cursor: pointer;
+        transition: 0.15s;
+        font-weight: 500;
+        border-left: 3px solid transparent;
+        font-size: 0.95rem;
+    }
+    .category-btn:hover {
+        background: #e9ecef;
+        border-left-color: #0d6efd;
+    }
+    .category-btn.active {
+        background: #e7f1ff;
+        border-left-color: #0d6efd;
+        color: #0d6efd;
+    }
+    .products-area { 
+        flex: 1; 
+        overflow-y: auto; 
+        padding: 20px; 
+    }
+    
+    .product-card { 
+        display: block; 
+        text-decoration: none; 
+        color: inherit;
+        background: white; 
+        border: 1px solid #eee; 
+        border-radius: 10px; 
+        cursor: pointer; 
+        transition: 0.15s; 
+        height: 100%;
+    }
+    .product-card:hover { 
+        border-color: #0d6efd; 
+        box-shadow: 0 5px 15px rgba(0,0,0,0.08); 
+    }
+    .product-card:active { 
+        transform: scale(0.96); 
+    }
+    
+    .cart-area { 
+        width: 420px; 
+        background: white; 
+        border-left: 1px solid #ddd; 
+        display: flex; 
+        flex-direction: column; 
+        z-index: 10; 
+        box-shadow: -5px 0 15px rgba(0,0,0,0.03); 
+    }
+    .cart-list { 
+        flex: 1; 
+        overflow-y: auto; 
+    }
+    .cart-footer { 
+        padding: 20px; 
+        border-top: 1px solid #eee; 
+        background: #fff; 
+    }
+    
+    .category-section {
+        margin-bottom: 30px;
+        scroll-margin-top: 60px;
+    }
+    .category-section h4 {
+        color: #0d6efd;
+        font-weight: 700;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #0d6efd;
+    }
+    
+    @keyframes flash { 
+        0% { background-color: #d1e7dd; } 
+        100% { background-color: transparent; } 
+    }
+    .highlight-row { 
+        animation: flash 1s ease-out; 
+    }
+</style>
+{% endblock %}
+
+{% block layout %}
+{% csrf_token %}
+
+<script>
+    const APP_URLS = {
+        cartAdd: "{% url 'cart_add' 0 %}".replace('/0/', '/'),
+        productSearch: "{% url 'search_products' %}",
+        checkout: "{% url 'cart_checkout' 0 %}".replace('/0/', '/'),
+        receiptDetails: "{% url 'receipt_details' 0 %}".replace('0/details/', ''),
+        receiptPdf: "{% url 'receipt_download_pdf' 0 %}".replace('0/download-pdf/', ''),
+        categoryList: "{% url 'category_list' %}"
+    };
+</script>
+
+<div class="pos-header">
+    <div style="width: 200px;">
+        <a href="{% url 'receipts_list_cashier' %}" class="btn btn-outline-dark fw-bold btn-sm">📋 Чеки</a>
     </div>
-    <div class="d-flex gap-2 align-items-center">
-        <a href="{% url 'receipts_list_cashier' %}" class="btn btn-outline-primary">
-            <i class="fas fa-receipt me-1"></i>Історія чеків
-        </a>
+    <div style="flex: 1; max-width: 600px;">
+        <input type="text" id="searchInput" class="form-control" placeholder="🔍 Пошук товару або штрихкоду..." autocomplete="off">
+    </div>
+    <div style="width: 200px; text-align: right;">
+        <span class="fw-bold me-2">{{ user.username }}</span>
     </div>
 </div>
 
-{% if request.GET.success %}
-    <div class="alert alert-success alert-dismissible fade show" role="alert" id="successAlert">
-        <h5 class="mb-1">Чек сформовано</h5>
-        <p class="mb-0">Клієнт отримав чек, ви готові продовжувати продажі.</p>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-{% endif %}
-
-<div class="row g-3">
-    {% for category in categories %}
-    <div class="col-sm-6 col-lg-4">
-        <a href="{% url 'category_detail' category.id %}" class="card card-hover h-100 text-center text-decoration-none text-dark">
-            {% if category.image %}
-                <div class="ratio ratio-4x3">
-                    <img src="{{ category.image.url }}" alt="{{ category.name }}" class="w-100 h-100" style="object-fit: cover; border-top-left-radius: 0.9rem; border-top-right-radius: 0.9rem;">
-                </div>
-            {% else %}
-                <div class="ratio ratio-4x3 d-flex align-items-center justify-content-center bg-light" style="border-top-left-radius: 0.9rem; border-top-right-radius: 0.9rem;">
-                    <i class="fas fa-layer-group text-primary fa-2x"></i>
-                </div>
-            {% endif %}
-            <div class="card-body">
-                <h5 class="card-title fw-bold mb-1">{{ category.name }}</h5>
-                <span class="badge badge-soft">Відкрити</span>
-            </div>
-        </a>
-    </div>
-    {% empty %}
-    <div class="col-12">
-        <div class="card card-hover text-center p-4">
-            <h4 class="mb-2">Категорій ще немає</h4>
-            <p class="text-muted mb-3">Додайте категорії в адмін-панелі, щоб розпочати продажі.</p>
-            <a href="/admin/" class="btn btn-dark">Відкрити admin</a>
-        </div>
+{% if messages %}
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
     {% endfor %}
 </div>
+{% endif %}
+
+<div class="main-layout">
+    <!-- Бокове меню категорій -->
+    <div class="categories-menu">
+        <div style="padding: 12px 15px; border-bottom: 1px solid #ddd; font-weight: 700; color: #666;">
+            КАТЕГОРІЇ
+        </div>
+        <button class="category-btn active" data-category="all">📦 Всі товари</button>
+        {% for category in categories %}
+        <button class="category-btn" data-category="{{ category.id }}">{{ category.name }}</button>
+        {% endfor %}
+    </div>
+
+    <!-- Область з товарами -->
+    <div class="products-area">
+        <!-- Всі товари разом -->
+        <div id="allProductsSection" class="category-section">
+            <h4>Всі товари</h4>
+            <div class="row g-3" id="allProductsGrid">
+                {% for category in categories %}
+                    {% for product in category.product_set.all %}
+                        <div class="col-md-3 product-item" data-category="all" data-category-id="{{ category.id }}">
+                            <div class="product-card add-btn" data-id="{{ product.id }}">
+                                {% if product.image %}
+                                    <img src="{{ product.image.url }}" style="height: 120px; object-fit: contain; width: 100%; padding: 10px;">
+                                {% else %}
+                                    <div class="d-flex align-items-center justify-content-center text-muted" style="height: 120px; background: #f8f9fa;">—</div>
+                                {% endif %}
+                                <div class="p-2 text-center border-top">
+                                    <div class="fw-bold text-truncate">{{ product.name }}</div>
+                                    <small class="text-muted d-block">{{ product.sku|default:"" }}</small>
+                                    <div class="fw-bold text-primary mt-1">{{ product.price }} ₴</div>
+                                    <span class="badge {% if product.quantity > 0 %}bg-success{% else %}bg-danger{% endif %} rounded-pill">
+                                        {% if product.quantity > 0 %}{{ product.quantity|floatformat:0|add:"0" }} шт{% else %}0 шт{% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Товари по категоріям -->
+        {% for category in categories %}
+        <div id="category-{{ category.id }}" class="category-section" style="display: none;">
+            <h4>{{ category.name }}</h4>
+            <div class="row g-3">
+                {% for product in category.product_set.all %}
+                <div class="col-md-3">
+                    <div class="product-card add-btn" data-id="{{ product.id }}">
+                        {% if product.image %}
+                            <img src="{{ product.image.url }}" style="height: 120px; object-fit: contain; width: 100%; padding: 10px;">
+                        {% else %}
+                            <div class="d-flex align-items-center justify-content-center text-muted" style="height: 120px; background: #f8f9fa;">—</div>
+                        {% endif %}
+                        <div class="p-2 text-center border-top">
+                            <div class="fw-bold text-truncate">{{ product.name }}</div>
+                            <small class="text-muted d-block">{{ product.sku|default:"" }}</small>
+                            <div class="fw-bold text-primary mt-1">{{ product.price }} ₴</div>
+                            <span class="badge {% if product.quantity > 0 %}bg-success{% else %}bg-danger{% endif %} rounded-pill">
+                                {% if product.quantity > 0 %}{{ product.quantity|floatformat:0|add:"0" }} шт{% else %}0 шт{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12">
+                    <div class="alert alert-info">Товарів у цій категорії немає</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Чек справа -->
+    <div class="cart-area">
+        <div style="padding: 20px; border-bottom: 1px solid #eee;">
+            <h5 class="mb-0">Поточний чек</h5>
+        </div>
+        <div class="cart-list">
+            <table class="table table-sm table-hover mb-0" id="cartTable">
+                <tr id="emptyRow"><td colspan="3" class="text-center py-5 text-muted">Кошик порожній</td></tr>
+            </table>
+        </div>
+        <div class="cart-footer">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                <span class="fw-bold">Разом:</span>
+                <span class="fw-bold text-primary" id="cartTotal" style="font-size: 1.2rem;">0.00 ₴</span>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-secondary flex-grow-1" onclick="location.reload()">Скинути</button>
+                <button class="btn btn-success btn-lg flex-grow-1" data-bs-toggle="modal" data-bs-target="#paymentModal">Оплата</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модаль оплати -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Оплата готівкою</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Сума до сплати:</label>
+                    <div class="alert alert-info mb-0">
+                        <h4 class="mb-0" id="totalAmount">0.00 ₴</h4>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="cashInput" class="form-label fw-bold">Готівка від клієнта (₴):</label>
+                    <input type="number" class="form-control form-control-lg" id="cashInput" placeholder="0.00" min="0" step="0.01">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Решта:</label>
+                    <div class="alert" id="changeAlert" style="display: none;">
+                        <h4 class="mb-0" id="changeAmount">0.00 ₴</h4>
+                    </div>
+                    <div id="noChangeAlert" class="alert alert-warning" style="display: none;">
+                        Введіть суму, щоб розрахувати решту
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрити</button>
+                <button type="button" class="btn btn-success btn-lg" id="confirmPaymentBtn">Підтвердити оплату</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модаль чеку -->
+<div class="modal fade" id="receiptModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Чек</h5>
+            </div>
+            <div class="modal-body" id="receiptContent" style="max-height: 60vh; overflow-y: auto;">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="downloadReceiptBtn">Завантажити PDF</button>
+                <button type="button" class="btn btn-success" id="closeReceiptBtn" data-bs-dismiss="modal">Готово</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
-{% if request.GET.success %}
 <script>
-    setTimeout(function() {
-        const alert = document.getElementById('successAlert');
-        if (alert) {
-            const bsAlert = new bootstrap.Alert(alert);
-            bsAlert.close();
+    const cartTable = document.getElementById('cartTable');
+    const cartTotal = document.getElementById('cartTotal');
+    const categoryBtns = document.querySelectorAll('.category-btn');
+    const productsArea = document.querySelector('.products-area');
+    
+    let barcodeBuffer = '';
+    let barcodeTimeout = null;
+    const BARCODE_TIMEOUT = 100;
+
+    // Навігація по категоріях
+    categoryBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            categoryBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            const categoryId = btn.dataset.category;
+            
+            if (categoryId === 'all') {
+                document.getElementById('allProductsSection').style.display = 'block';
+                {% for category in categories %}
+                document.getElementById('category-{{ category.id }}').style.display = 'none';
+                {% endfor %}
+            } else {
+                document.getElementById('allProductsSection').style.display = 'none';
+                {% for category in categories %}
+                document.getElementById('category-{{ category.id }}').style.display = categoryId === '{{ category.id }}' ? 'block' : 'none';
+                {% endfor %}
+            }
+        });
+    });
+
+    // Барбокод сканер
+    document.addEventListener('keypress', function(e) {
+        const activeElement = document.activeElement;
+        const isInputField = activeElement.tagName === 'INPUT' || 
+                            activeElement.tagName === 'TEXTAREA' ||
+                            activeElement.isContentEditable;
+        
+        if (activeElement.id === 'searchInput' && barcodeBuffer.length < 3) {
+            return;
         }
-    }, 5000);
+        
+        const paymentModal = document.getElementById('paymentModal');
+        if (paymentModal && paymentModal.classList.contains('show')) {
+            return;
+        }
+        
+        const receiptModal = document.getElementById('receiptModal');
+        if (receiptModal && receiptModal.classList.contains('show')) {
+            return;
+        }
+        
+        clearTimeout(barcodeTimeout);
+        
+        if (e.key === 'Enter' && barcodeBuffer.length >= 3) {
+            e.preventDefault();
+            processBarcodeInput(barcodeBuffer.trim());
+            barcodeBuffer = '';
+            return;
+        }
+        
+        if (e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey) {
+            barcodeBuffer += e.key;
+            
+            if (barcodeBuffer.length >= 13) {
+                e.preventDefault();
+                processBarcodeInput(barcodeBuffer.trim());
+                barcodeBuffer = '';
+                return;
+            }
+            
+            barcodeTimeout = setTimeout(() => {
+                if (barcodeBuffer.length >= 3) {
+                    processBarcodeInput(barcodeBuffer.trim());
+                }
+                barcodeBuffer = '';
+            }, BARCODE_TIMEOUT);
+        }
+    });
+    
+    function processBarcodeInput(barcode) {
+        fetch(`${APP_URLS.productSearch}?q=${encodeURIComponent(barcode)}`)
+        .then(res => res.ok ? res.json() : Promise.reject('Network error'))
+        .then(data => {
+            const allProducts = [...data.here, ...data.others];
+            
+            if (allProducts.length === 0) {
+                showBarcodeNotification('Товар не знайдено', 'danger');
+                return;
+            }
+            
+            let product = allProducts.find(p => p.sku && p.sku.toLowerCase() === barcode.toLowerCase());
+            
+            if (!product) {
+                product = allProducts[0];
+            }
+            
+            if (parseFloat(product.quantity) <= 0) {
+                showBarcodeNotification(`Немає в наявності: ${product.name}`, 'warning');
+                return;
+            }
+            
+            addProductToCart(product.id, product.name);
+        })
+        .catch(() => {
+            showBarcodeNotification('Помилка пошуку', 'danger');
+        });
+    }
+    
+    function addProductToCart(productId, productName) {
+        fetch(`${APP_URLS.cartAdd}${productId}/`, { 
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            credentials: 'same-origin'
+        })
+        .then(async res => {
+            const contentType = res.headers.get('content-type') || '';
+            if (!res.ok || !contentType.includes('application/json')) {
+                throw new Error(`Unexpected response: ${res.status}`);
+            }
+            return res.json();
+        })
+        .then(data => {
+            if(data.status === 'success') {
+                updateCartUI(data);
+                showBarcodeNotification(`Додано: ${productName}`, 'success');
+            } else {
+                showBarcodeNotification(data.message || 'Помилка', 'danger');
+            }
+        })
+        .catch(() => {
+            showBarcodeNotification('Не вдалося додати товар', 'danger');
+        });
+    }
+    
+    function showBarcodeNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type} position-fixed top-0 start-50 translate-middle-x mt-5`;
+        notification.style.zIndex = '9999';
+        notification.style.minWidth = '300px';
+        notification.style.textAlign = 'center';
+        notification.style.fontSize = '1.1rem';
+        notification.style.fontWeight = 'bold';
+        notification.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+        notification.innerHTML = message;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.transition = 'opacity 0.3s';
+            notification.style.opacity = '0';
+            setTimeout(() => notification.remove(), 300);
+        }, 2000);
+    }
+
+    // Додавання товару при кліку
+    document.addEventListener('click', function(e) {
+        const card = e.target.closest('.add-btn');
+        if (card) {
+            e.preventDefault();
+            const pid = card.dataset.id;
+            card.style.transform = "scale(0.96)";
+            setTimeout(() => card.style.transform = "scale(1)", 100);
+
+            fetch(`${APP_URLS.cartAdd}${pid}/`, { 
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                credentials: 'same-origin'
+            })
+            .then(async res => {
+                const contentType = res.headers.get('content-type') || '';
+                if (!res.ok || !contentType.includes('application/json')) {
+                    throw new Error(`Unexpected response: ${res.status}`);
+                }
+                return res.json();
+            })
+            .then(data => {
+                if(data.status === 'success') {
+                    updateCartUI(data);
+                } else {
+                    showBarcodeNotification(data.message || 'Помилка', 'danger');
+                }
+            })
+            .catch(() => {
+                showBarcodeNotification('Помилка додавання', 'danger');
+            });
+        }
+    });
+
+    function updateCartUI(data) {
+        cartTotal.innerText = parseFloat(data.cart_total).toFixed(2) + ' ₴';
+        
+        let html = '';
+        data.cart_items.forEach(item => {
+            const isNew = item.id === data.added_id ? 'highlight-row' : '';
+            const qtyNum = parseFloat(item.qty);
+            const qtyDisplay = Number.isInteger(qtyNum) ? qtyNum.toFixed(0) : qtyNum.toFixed(3);
+            html += `
+            <tr class="${isNew}">
+                <td class="ps-3"><div class="text-truncate fw-bold" style="max-width: 140px;">${escapeHtml(item.name)}</div><small class="text-muted">${parseFloat(item.price).toFixed(2)} ₴</small></td>
+                <td class="text-center align-middle"><span class="badge bg-secondary">x${qtyDisplay}</span></td>
+                <td class="text-end pe-3 align-middle fw-bold">${parseFloat(item.total).toFixed(2)} ₴</td>
+            </tr>`;
+        });
+        cartTable.innerHTML = html || `<tr id="emptyRow"><td colspan="3" class="text-center py-5 text-muted">Кошик порожній</td></tr>`;
+        
+        document.querySelector('.cart-list').scrollTop = document.querySelector('.cart-list').scrollHeight;
+    }
+
+    function escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+
+    // Логіка оплати
+    const paymentModal = document.getElementById('paymentModal');
+    const cashInput = document.getElementById('cashInput');
+    const totalAmount = document.getElementById('totalAmount');
+    const changeAmount = document.getElementById('changeAmount');
+    const changeAlert = document.getElementById('changeAlert');
+    const noChangeAlert = document.getElementById('noChangeAlert');
+    const confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
+    
+    paymentModal.addEventListener('show.bs.modal', function() {
+        totalAmount.textContent = parseFloat(cartTotal.textContent).toFixed(2) + ' ₴';
+        cashInput.value = '';
+        cashInput.focus();
+        updateChange();
+    });
+    
+    cashInput.addEventListener('input', updateChange);
+    
+    function updateChange() {
+        const total = parseFloat(cartTotal.textContent) || 0;
+        const cash = parseFloat(cashInput.value) || 0;
+        
+        if (cash === 0 || isNaN(cash) || cashInput.value === '') {
+            changeAlert.style.display = 'none';
+            noChangeAlert.style.display = 'block';
+            confirmPaymentBtn.disabled = true;
+            return;
+        }
+        
+        const change = cash - total;
+        noChangeAlert.style.display = 'none';
+        
+        if (change < 0) {
+            changeAlert.innerHTML = `<h4 class="mb-0 text-danger">Не вистачає: ${Math.abs(change).toFixed(2)} ₴</h4>`;
+            changeAlert.className = 'alert alert-danger';
+            changeAlert.style.display = 'block';
+            confirmPaymentBtn.disabled = true;
+        } else {
+            changeAlert.className = 'alert alert-success';
+            changeAlert.innerHTML = `<h4 class="mb-0" id="changeAmount">${change.toFixed(2)} ₴</h4>`;
+            changeAlert.style.display = 'block';
+            confirmPaymentBtn.disabled = false;
+        }
+    }
+    
+    confirmPaymentBtn.addEventListener('click', function() {
+        const total = parseFloat(cartTotal.textContent) || 0;
+        const cash = parseFloat(cashInput.value) || 0;
+        const change = cash - total;
+        
+        if (change < 0) {
+            showBarcodeNotification('Недостатньо коштів', 'warning');
+            return;
+        }
+        
+        const paymentModal = bootstrap.Modal.getInstance(document.getElementById('paymentModal'));
+        paymentModal.hide();
+        
+        const receiptContent = document.getElementById('receiptContent');
+        receiptContent.innerHTML = '<div class="text-center py-5"><div class="spinner-border" role="status"><span class="visually-hidden">Завантаження...</span></div></div>';
+        
+        // Знаходимо категорію для checkout
+        const firstProduct = document.querySelector('.add-btn');
+        const categoryId = firstProduct ? firstProduct.closest('[data-category-id]')?.dataset.categoryId : 1;
+        
+        fetch(`${APP_URLS.checkout}${categoryId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'
+        })
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
+            return res.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                const orderId = data.order_id;
+                
+                return fetch(`${APP_URLS.receiptDetails}${orderId}/details/`, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                }).then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                    }
+                    return res.json();
+                }).then(receiptData => {
+                    if (receiptData.status === 'success') {
+                        receiptContent.innerHTML = receiptData.receipt_html;
+                        document.getElementById('downloadReceiptBtn').dataset.orderId = orderId;
+                        const receiptModal = new bootstrap.Modal(document.getElementById('receiptModal'));
+                        receiptModal.show();
+                        
+                        document.getElementById('closeReceiptBtn').onclick = function() {
+                            receiptModal.hide();
+                            setTimeout(() => {
+                                window.location.href = `{% url "category_list" %}?success=1`;
+                            }, 300);
+                        };
+                    } else {
+                        throw new Error('Не вдалося зчитати чек');
+                    }
+                });
+            } else {
+                throw new Error(data.message || 'Не вдалося завершити оплату');
+            }
+        })
+        .catch(error => {
+            showBarcodeNotification('Помилка: ' + error.message, 'danger');
+            setTimeout(() => location.reload(), 2500);
+        });
+    });
+    
+    document.getElementById('downloadReceiptBtn').addEventListener('click', function() {
+        const orderId = this.dataset.orderId;
+        window.location.href = `${APP_URLS.receiptPdf}${orderId}/download-pdf/`;
+    });
+
+    // Пошук
+    let searchTimeout;
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+        const q = e.target.value.trim();
+        
+        clearTimeout(searchTimeout);
+        
+        if(q.length === 0) { 
+            location.reload(); 
+            return; 
+        }
+        
+        if(q.length < 1) return;
+
+        searchTimeout = setTimeout(() => {
+            fetch(`${APP_URLS.productSearch}?q=${encodeURIComponent(q)}`)
+            .then(res => {
+                if (!res.ok) throw new Error('Network response was not ok');
+                return res.json();
+            })
+            .then(data => {
+                const allSection = document.getElementById('allProductsSection');
+                const grid = allSection.querySelector('.row');
+                grid.innerHTML = '';
+                
+                const all = [...data.here, ...data.others];
+                if(all.length === 0) { 
+                    grid.innerHTML = '<div class="col-12 text-center text-muted mt-5">Нічого не знайдено</div>'; 
+                    return; 
+                }
+
+                const inStock = all.filter(p => parseFloat(p.quantity) > 0);
+                const outOfStock = all.filter(p => parseFloat(p.quantity) <= 0);
+                
+                inStock.forEach(p => {
+                    const imgHtml = p.image_url ? 
+                        `<img src="${p.image_url}" style="height: 120px; object-fit: contain; width: 100%; padding: 10px;">` : 
+                        `<div class="d-flex align-items-center justify-content-center text-muted" style="height: 120px; background: #f8f9fa;">—</div>`;
+                    
+                    grid.innerHTML += `
+                    <div class="col-md-3">
+                        <div class="product-card add-btn" data-id="${p.id}">
+                            ${imgHtml}
+                            <div class="p-2 text-center border-top">
+                                <div class="fw-bold text-truncate">${escapeHtml(p.name)}</div>
+                                <small class="text-muted d-block">${escapeHtml(p.sku)} ${escapeHtml(p.weight)}</small>
+                                <div class="fw-bold text-primary mt-1">${parseFloat(p.price).toFixed(2)} ₴</div>
+                                <span class="badge bg-success rounded-pill">${Math.round(p.quantity)} шт</span>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                
+                if (outOfStock.length > 0) {
+                    grid.innerHTML += '<div class="col-12"><hr class="my-3"><h5 class="text-muted text-center">Немає в наявності</h5><hr class="my-3"></div>';
+                    
+                    outOfStock.forEach(p => {
+                        const imgHtml = p.image_url ? 
+                            `<img src="${p.image_url}" style="height: 120px; object-fit: contain; width: 100%; padding: 10px;">` : 
+                            `<div class="d-flex align-items-center justify-content-center text-muted" style="height: 120px; background: #f8f9fa;">—</div>`;
+                        
+                        grid.innerHTML += `
+                        <div class="col-md-3">
+                            <div class="product-card add-btn opacity-75" data-id="${p.id}">
+                                ${imgHtml}
+                                <div class="p-2 text-center border-top">
+                                    <div class="fw-bold text-truncate">${escapeHtml(p.name)}</div>
+                                    <small class="text-muted d-block">${escapeHtml(p.sku)} ${escapeHtml(p.weight)}</small>
+                                    <div class="fw-bold text-primary mt-1">${parseFloat(p.price).toFixed(2)} ₴</div>
+                                    <span class="badge bg-danger rounded-pill">0 шт</span>
+                                </div>
+                            </div>
+                        </div>`;
+                    });
+                }
+            })
+            .catch(() => {
+                const allSection = document.getElementById('allProductsSection');
+                const grid = allSection.querySelector('.row');
+                grid.innerHTML = '<div class="col-12 text-center text-danger mt-5">Помилка пошуку</div>';
+            });
+        }, 300);
+    });
 </script>
-{% endif %}
 {% endblock %}

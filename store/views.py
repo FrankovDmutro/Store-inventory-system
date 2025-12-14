@@ -20,8 +20,30 @@ logger = logging.getLogger(__name__)
 @login_required
 @role_required(ROLE_CASHIER)
 def category_list(request):
-    categories = Category.objects.all()
-    return render(request, 'store/category_list.html', {'categories': categories})
+    categories = Category.objects.all().prefetch_related(
+        'product_set'
+    )
+    
+    # Отримуємо кошик для початкового завантаження
+    cart = request.session.get('cart', {})
+    cart_items = []
+    cart_total_price = Decimal('0')
+    
+    for pid, qty in cart.items():
+        try:
+            p = Product.objects.get(id=pid)
+            qty_decimal = Decimal(str(qty))
+            total = p.price * qty_decimal
+            cart_total_price += total
+            cart_items.append({'product': p, 'quantity': float(qty_decimal), 'total': total})
+        except (Product.DoesNotExist, ValueError, InvalidOperation):
+            continue
+    
+    return render(request, 'store/category_list.html', {
+        'categories': categories,
+        'cart_items': cart_items,
+        'cart_total_price': cart_total_price
+    })
 
 @login_required
 @role_required(ROLE_CASHIER)

@@ -37,11 +37,11 @@
 
 <script>
     const APP_URLS = {
-        cartAdd: "{% url 'cart_add' 0 %}".slice(0, -2),
+        cartAdd: "{% url 'cart_add' 0 %}".replace('/0/', '/'),
         productSearch: "{% url 'search_products' %}",
         checkout: "{% url 'cart_checkout' category.id %}",
-        receiptDetails: "{% url 'receipt_details' 0 %}".slice(0, -2),
-        receiptPdf: "{% url 'receipt_download_pdf' 0 %}".slice(0, -2),
+        receiptDetails: "{% url 'receipt_details' 0 %}".replace('0/details/', ''),
+        receiptPdf: "{% url 'receipt_download_pdf' 0 %}".replace('0/download-pdf/', ''),
         categoryList: "{% url 'category_list' %}"
     };
 </script>
