@@ -199,17 +199,39 @@ const allProducts = JSON.parse('{{ products_json|escapejs }}');
 let currentSupplierId = null;
 let draftItems = {};
 
+console.log('=== Завантажено товарів:', allProducts.length);
+console.log('=== Приклад товару:', allProducts[0]);
+
+// Перевірка на дублікати supplier_id
+const supplierIds = new Set();
+allProducts.forEach(p => {
+    if (p.supplier_id) supplierIds.add(p.supplier_id);
+});
+console.log('=== Унікальних постачальників у товарах:', supplierIds.size, Array.from(supplierIds));
+
 function loadSupplierProducts() {
     const productsList = document.getElementById('productsList');
     const supplierId = parseInt(currentSupplierId);
+    
+    console.log('Current supplier ID:', supplierId);
+    console.log('All products:', allProducts.length);
+    
     const supplierProducts = allProducts
-        .filter(p => p.supplier_id === supplierId || p.supplier_id === null)
+        .filter(p => {
+            const matches = p.supplier_id === supplierId || p.supplier_id === null;
+            if (!matches) {
+                console.log('Product excluded:', p.name, 'supplier_id:', p.supplier_id, 'expected:', supplierId);
+            }
+            return matches;
+        })
         .sort((a, b) => {
             const sa = Number(a.stock) || 0;
             const sb = Number(b.stock) || 0;
             if (sa !== sb) return sa - sb;
             return (a.name || '').localeCompare(b.name || '');
         });
+
+    console.log('Filtered products:', supplierProducts.length);
 
     if (supplierProducts.length === 0) {
         productsList.innerHTML = '<p class="text-muted text-center mb-0">Немає товарів, прив’язаних до цього постачальника.</p>';
@@ -218,7 +240,6 @@ function loadSupplierProducts() {
 
     let html = '<div class="list-group list-group-flush">';
     supplierProducts.forEach(product => {
-        const escapedName = (product.name || '').replace(/'/g, "\\'");
         html += `
             <div class="list-group-item d-flex justify-content-between align-items-center">
                 <div class="flex-grow-1">
@@ -230,7 +251,10 @@ function loadSupplierProducts() {
                     </div>
                 </div>
                 <div class="ms-2">
-                    <button type="button" class="btn btn-sm btn-primary" onclick="addProductToDraft(${product.id}, '${escapedName}', ${product.purchase_price})">
+                    <button type="button" class="btn btn-sm btn-primary add-to-draft-btn" 
+                            data-product-id="${product.id}" 
+                            data-product-name="${product.name}" 
+                            data-purchase-price="${product.purchase_price}">
                         <i class="fas fa-plus"></i>
                     </button>
                 </div>
@@ -239,6 +263,16 @@ function loadSupplierProducts() {
     });
     html += '</div>';
     productsList.innerHTML = html;
+    
+    // Додаємо обробники подій для всіх кнопок
+    document.querySelectorAll('.add-to-draft-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const productId = parseInt(this.getAttribute('data-product-id'));
+            const productName = this.getAttribute('data-product-name');
+            const purchasePrice = parseFloat(this.getAttribute('data-purchase-price'));
+            addProductToDraft(productId, productName, purchasePrice);
+        });
+    });
 }
 
 function addProductToDraft(productId, productName, purchasePrice) {
@@ -323,9 +357,9 @@ function updateDraftDisplay() {
                     ${supplierBadge}
                 </td>
                 <td class="align-middle text-center">
-                    <input type="number" class="form-control form-control-sm d-inline-block" style="width: 70px;"
+                    <input type="number" class="form-control form-control-sm d-inline-block qty-input" style="width: 70px;"
                            value="${item.quantity}" step="1" min="1"
-                           onchange="updateProductQuantity(${item.product_id}, this.value)">
+                           data-product-id="${item.product_id}">
                 </td>
                 <td class="align-middle text-end">
                     <span class="text-muted">${Number(item.unit_cost).toFixed(2)} ₴</span>
@@ -334,7 +368,7 @@ function updateDraftDisplay() {
                     <strong>${itemTotal.toFixed(2)} ₴</strong>
                 </td>
                 <td class="align-middle text-end">
-                    <button type="button" class="btn btn-sm btn-danger" onclick="removeProductFromDraft(${item.product_id})">
+                    <button type="button" class="btn btn-sm btn-danger remove-from-draft-btn" data-product-id="${item.product_id}">
                         <i class="fas fa-trash"></i>
                     </button>
                 </td>
@@ -344,6 +378,22 @@ function updateDraftDisplay() {
 
     html += '</tbody></table></div>';
     draftDiv.innerHTML = html;
+
+    // Додаємо обробники подій для кнопок та інпутів
+    document.querySelectorAll('.qty-input').forEach(input => {
+        input.addEventListener('change', function() {
+            const productId = parseInt(this.getAttribute('data-product-id'));
+            const quantity = this.value;
+            updateProductQuantity(productId, quantity);
+        });
+    });
+    
+    document.querySelectorAll('.remove-from-draft-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const productId = parseInt(this.getAttribute('data-product-id'));
+            removeProductFromDraft(productId);
+        });
+    });
 
     document.getElementById('itemsCount').textContent = items.length;
     document.getElementById('totalCost').textContent = total.toFixed(2) + ' ₴';
